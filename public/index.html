@@ -13,42 +13,65 @@
   </header>
 
   <main>
-    <section class="panel tasks">
-      <h2>Tasks</h2>
-      <div class="placeholder">
-        Task board connects next: voice → Deepgram → command → tasks here.<br />
-        Pending · Accepted · Reported done · Corrections
+    <section class="panel left">
+      <div class="row-head">
+        <h2>Listening <small>band or computer mic → Deepgram</small></h2>
+        <div class="buttons">
+          <button id="band-connect">Connect band</button>
+          <button id="mic-toggle">🎙 Listen with computer mic</button>
+          <button id="listen-stop" class="danger" hidden>Stop listening</button>
+        </div>
       </div>
+      <div id="listen-status" class="status">Loading…</div>
+      <div id="mic-notice" class="mic-notice" hidden>● Listening: microphone audio is being sent to Deepgram, and finished sentences to OpenAI. Tell people nearby.</div>
+      <div id="listen-err" class="err" hidden></div>
+
+      <div class="row-head sub">
+        <h2>Crew <small>only these names get tasks</small></h2>
+      </div>
+      <div id="crew" class="crew"></div>
+      <form id="crew-add" class="crew-add">
+        <input id="crew-name" maxlength="30" placeholder="Add a crew name, e.g. Mark" autocomplete="off" />
+        <button type="submit">Add</button>
+      </form>
+      <div class="voices">
+        <label>Voice 1 is <select data-voice="0"></select></label>
+        <label>Voice 2 is <select data-voice="1"></select></label>
+        <span class="hint">Voice 1 = first voice heard after you start listening.</span>
+      </div>
+      <div id="crew-err" class="err" hidden></div>
+
+      <div class="row-head sub">
+        <h2>Transcript <small>voices told apart automatically</small></h2>
+      </div>
+      <div id="interim" class="interim"></div>
+      <ol id="transcript" class="transcript"></ol>
     </section>
 
-    <section class="panel voice">
-      <div class="voice-head">
-        <h2>Relay Voice <small>MiniMax → earpiece</small></h2>
+    <section class="panel right">
+      <div class="row-head">
+        <h2>Tasks</h2>
+        <button id="handoff">Speak handoff</button>
+      </div>
+      <div id="alerts" class="alerts"></div>
+      <div id="timers" class="timers"></div>
+      <div class="board">
+        <div class="col"><h3>Pending</h3><ol id="col-pending"></ol></div>
+        <div class="col"><h3>Accepted</h3><ol id="col-accepted"></ol></div>
+        <div class="col"><h3>Reported done</h3><ol id="col-done"></ol></div>
+        <div class="col"><h3>Findings</h3><ol id="col-findings"></ol></div>
+      </div>
+
+      <div class="row-head sub">
+        <h2>Relay voice <small>MiniMax → earpiece</small></h2>
         <button id="earpiece" class="toggle" aria-pressed="false">🔇 Earpiece off</button>
       </div>
       <div id="now" class="now idle">Silent</div>
       <ol id="log" class="log"></ol>
-
-      <details class="console" open>
-        <summary>Voice test console</summary>
-        <div class="samples">
-          <button data-kind="taskAssigned">Task assigned</button>
-          <button data-kind="taskAccepted">Accepted</button>
-          <button data-kind="taskCompleted">Completed</button>
-          <button data-kind="timerStarted">Timer started</button>
-          <button data-kind="timerExpired">Timer expired</button>
-          <button data-kind="correction">Correction</button>
-          <button data-kind="clarify">Clarify</button>
-          <button data-kind="handoff">Handoff</button>
-        </div>
-        <form id="custom">
-          <input id="text" maxlength="3000" placeholder="Type anything for Relay to say…" />
-          <button type="submit">Speak</button>
-        </form>
-        <div id="err" class="err" hidden></div>
-      </details>
+      <div id="err" class="err" hidden></div>
     </section>
   </main>
   <script src="/app.js"></script>
+  <script type="module" src="/listen.js"></script>
 </body>
 </html>

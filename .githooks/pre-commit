@@ -16,6 +16,18 @@ for f in $(git diff --cached --name-only --diff-filter=ACMR); do
   fi
 done
 
+# 3. the actual secret values from the local .env, anywhere in added lines (catches a bare pasted key)
+if [ -f .env ]; then
+  # -E (extended regex) works with both macOS/BSD and GNU sed
+  secrets=$(sed -nE 's/^[A-Z0-9_]*(KEY|SECRET|TOKEN)[A-Z0-9_]*=["'"'"']?([^"'"'"' ]{12,}).*/\2/p' .env)
+  if [ -n "$secrets" ]; then
+    added=$(git diff --cached -U0 | grep -E '^\+[^+]')
+    echo "$secrets" | while IFS= read -r s; do
+      [ -n "$s" ] && printf '%s\n' "$added" | grep -qF -- "$s" && echo "hit"
+    done | grep -q hit && { echo "BLOCKED: a secret value from .env is in the staged changes (value not shown)"; fail=1; }
+  fi
+fi
+
 if [ $fail -ne 0 ]; then
   echo "Remove the secret (keep keys in .env). If this is a false positive: git commit --no-verify"
   exit 1

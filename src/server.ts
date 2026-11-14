@@ -1,39 +1,57 @@
 import express, { type Response } from "express";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { config } from "./config.js";
 import { VoiceService, type SpokenLine } from "./voice.js";
-import { phrases } from "./phrases.js";
-import { MAX_TEXT_CHARS } from "./minimax.js";
+import { TranscriptionSession, type Transcript } from "./stt.js";
+import { attachListenServer } from "./listen.js";
+import { interpret } from "./interpret.js";
+import { Relay, cleanCrew } from "./relay.js";
+
+// The crew roster typed on the dashboard, kept across restarts (git-ignored with the rest of .cache/).
+const crewFile = path.resolve(".cache", "crew.json");
+function loadCrew(): string[] {
+  try {
+    return cleanCrew(JSON.parse(readFileSync(crewFile, "utf8")));
+  } catch {
+    return [];
+  }
+}
 
 const voice = new VoiceService({ ...config.minimax });
 const app = express();
-app.use(express.json({ limit: "64kb" }));
+app.use(express.json({ limit: "16kb" }));
 app.use(express.static(path.resolve("public")));
+
+// ---- Vexo Open kit: the band library (browser ES modules) ----
+const kitLib = path.join(config.vexo.kitDir, "js", "src");
+const kitAvailable = existsSync(path.join(kitLib, "index.js"));
+app.use("/vexo", express.static(kitLib));
+
+app.get("/api/config", (_req, res) =>
+  res.json({
+    band: config.vexo.band,
+    kitAvailable,
+    deepgramKey: Boolean(config.deepgram.apiKey),
+    openaiKey: Boolean(config.openai.apiKey),
+    minimaxKey: Boolean(config.minimax.apiKey),
+  })
+);
 
 // ---- live event stream (SSE) to dashboards / earpiece devices ----
 const clients = new Set<Response>();
 const voiceLog: SpokenLine[] = [];
+let listening: { on: boolean; source: string | null } = { on: false, source: null };
 
 function broadcast(event: string, data: unknown) {
   const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const c of clients) c.write(msg);
 }
 
-app.get("/api/events", (req, res) => {
-  res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
-  res.flushHeaders();
-  res.write(`event: snapshot\ndata: ${JSON.stringify({ voiceLog })}\n\n`);
-  clients.add(res);
-  const ping = setInterval(() => res.write(": ping\n\n"), 20000);
-  req.on("close", () => {
-    clearInterval(ping);
-    clients.delete(res);
-  });
-});
-
-/** Speak a line through Relay's voice: synthesize (or cache-hit), log it, push it to every connected device. */
-export async function say(text: string, kind = "custom"): Promise<SpokenLine> {
+/** Speak a line through Relay's voice: synthesize (or cache-hit), log it, push it to every connected earpiece. */
+async function say(text: string, kind: string): Promise<void> {
   const r = await voice.speak(text);
   const line: SpokenLine = {
     id: randomUUID(),
@@ -49,15 +67,34 @@ export async function say(text: string, kind = "custom"): Promise<SpokenLine> {
   if (voiceLog.length > 200) voiceLog.shift();
   broadcast("spoken", line);
   broadcast("usage", await voice.usage());
-  return line;
 }
 
-function sendError(res: Response, err: unknown) {
-  const e = err as Error & { statusCode?: number };
-  console.error("[voice]", e.message);
-  broadcast("voice_error", { message: e.message, at: new Date().toISOString() });
-  res.status(502).json({ error: e.message });
-}
+// OpenAI spend, visible in the server log (this run only).
+const openaiUsage = { requests: 0, inputTokens: 0, outputTokens: 0 };
+const onUsage = (u: { inputTokens: number; outputTokens: number }) => {
+  openaiUsage.requests++;
+  openaiUsage.inputTokens += u.inputTokens;
+  openaiUsage.outputTokens += u.outputTokens;
+  console.log(`[openai] +${u.inputTokens} in / +${u.outputTokens} out tokens · this run: ${openaiUsage.requests} requests, ${openaiUsage.inputTokens} in / ${openaiUsage.outputTokens} out`);
+};
+
+const relay = new Relay({
+  interpret: (ctx) => interpret(ctx, { ...config.openai, onUsage }),
+  speak: say,
+  broadcast,
+}, loadCrew());
+
+app.get("/api/events", (req, res) => {
+  res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+  res.flushHeaders();
+  res.write(`event: snapshot\ndata: ${JSON.stringify({ voiceLog, listening, ...relay.snapshot() })}\n\n`);
+  clients.add(res);
+  const ping = setInterval(() => res.write(": ping\n\n"), 20000);
+  req.on("close", () => {
+    clearInterval(ping);
+    clients.delete(res);
+  });
+});
 
 app.get("/api/audio/:id.mp3", (req, res) => {
   let file: string;
@@ -71,44 +108,69 @@ app.get("/api/audio/:id.mp3", (req, res) => {
 
 app.get("/api/voice/usage", async (_req, res) => res.json(await voice.usage()));
 
-app.post("/api/speak", async (req, res) => {
-  const text = typeof req.body?.text === "string" ? req.body.text : "";
-  if (!text.trim()) return res.status(400).json({ error: "text is required" });
-  if (text.length > MAX_TEXT_CHARS) return res.status(400).json({ error: `text must be under ${MAX_TEXT_CHARS} chars` });
+// The crew roster, typed on the dashboard. Only these names can be given tasks; Deepgram is primed with them
+// (from the next listening session on — a session's settings are fixed when it opens).
+app.post("/api/crew", async (req, res) => {
   try {
-    res.json(await say(text, "custom"));
+    relay.setCrew(req.body?.crew);
   } catch (err) {
-    sendError(res, err);
+    return res.status(400).json({ error: (err as Error).message });
+  }
+  await mkdir(path.dirname(crewFile), { recursive: true });
+  await writeFile(crewFile, JSON.stringify(relay.crew));
+  res.json({ crew: relay.crew, voices: relay.voices });
+});
+
+// Which crew member each detected voice is. Deepgram numbers voices in the order it first hears them
+// in each listening session, so this may need setting again after listening restarts.
+app.post("/api/voices", (req, res) => {
+  const { index, name } = req.body ?? {};
+  try {
+    relay.setVoice(Number(index), typeof name === "string" && name ? name : null);
+  } catch (err) {
+    return res.status(400).json({ error: (err as Error).message });
+  }
+  res.json({ voices: relay.voices });
+});
+
+// Spoken handoff for the hospital, from the current task state (also available by voice: "give me the handoff").
+app.post("/api/handoff", async (_req, res) => {
+  const text = relay.handoffText();
+  try {
+    await say(text, "handoff");
+    res.json({ text });
+  } catch (err) {
+    const message = (err as Error).message;
+    broadcast("voice_error", { message, at: new Date().toISOString() });
+    res.status(502).json({ error: message, text });
   }
 });
 
-// Demo buttons: speak each kind of confirmation with sample data.
-const samples: Record<string, () => string> = {
-  taskAssigned: () => phrases.taskAssigned("repeat blood pressure", "Alex"),
-  taskAccepted: () => phrases.taskAccepted("repeat blood pressure", "Alex"),
-  taskCompleted: () => phrases.taskCompleted("repeat blood pressure", "Alex", "BP 110 over 70"),
-  timerStarted: () => phrases.timerStarted(120, "Alex"),
-  timerExpired: () => phrases.timerExpired("Alex", "two-minute"),
-  correction: () => phrases.correction("blood pressure", "110 over 70", "100 over 70"),
-  clarify: () => phrases.clarify("who that task is for"),
-  handoff: () =>
-    phrases.handoff(
-      ["blood pressure 100 over 70, corrected from 110", "aspirin 324 milligrams given"],
-      ["Jordan: twelve-lead ECG not yet reported"]
-    ),
-};
-
-app.post("/api/voice/sample/:kind", async (req, res) => {
-  const make = samples[req.params.kind];
-  if (!make) return res.status(404).json({ error: "unknown sample" });
-  try {
-    res.json(await say(make(), req.params.kind));
-  } catch (err) {
-    sendError(res, err);
-  }
-});
-
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
+  const k = (v: string) => (v ? "set" : "MISSING");
   console.log(`Relay running at http://localhost:${config.port}`);
-  console.log(`MiniMax model=${config.minimax.model} voice=${config.minimax.voiceId} key=${config.minimax.apiKey ? "set" : "MISSING"}`);
+  console.log(`MiniMax key=${k(config.minimax.apiKey)} · Deepgram key=${k(config.deepgram.apiKey)} · OpenAI key=${k(config.openai.apiKey)} model=${config.openai.model}`);
+  console.log(`Band Vexo-HACK-${String(config.vexo.band).padStart(2, "0")} · crew: ${relay.crew.join(", ") || "(none yet: add names on the dashboard)"}`);
+  if (!kitAvailable) console.warn("vexo-open-kit/ not found — run `npm run kit` to fetch the band library.");
+});
+
+// ---- band mic or computer mic -> Deepgram -> transcripts -> Relay (tasks + spoken confirmations) ----
+attachListenServer(server, (handlers, source) => new TranscriptionSession(config.deepgram, handlers, undefined, source, relay.crew), {
+  onListening(on, source) {
+    listening = { on, source: on ? source : null };
+    console.log(on ? `[stt] listening (${source}): audio is being sent to Deepgram` : "[stt] stopped listening");
+    if (!on) relay.endSession();
+    broadcast("listening", { ...listening, at: new Date().toISOString() });
+  },
+  onTranscript(t: Transcript) {
+    broadcast("transcript", { ...t, id: randomUUID(), at: new Date().toISOString(), speakerName: relay.speakerName(t.speaker) });
+    relay.onTranscript(t);
+  },
+  onUtteranceEnd() {
+    relay.onUtteranceEnd();
+  },
+  onError(message) {
+    console.error("[stt]", message);
+    broadcast("stt_error", { message, at: new Date().toISOString() });
+  },
 });

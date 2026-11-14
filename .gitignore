@@ -1,4 +1,6 @@
 node_modules/
+# Vexo Open kit: cloned locally by `npm run kit`, never committed (it has its own repo)
+vexo-open-kit/
 # secrets: never commit any env file except the blank template
 .env
 .env.*

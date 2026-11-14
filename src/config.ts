@@ -10,4 +10,20 @@ export const config = {
     charBudget: Number(process.env.MINIMAX_CHAR_BUDGET ?? 150000),
     cacheDir: path.resolve(".cache/tts"),
   },
+  deepgram: {
+    apiKey: process.env.DEEPGRAM_API_KEY ?? "",
+    model: process.env.DEEPGRAM_MODEL || "nova-3",
+    language: "en",
+    endpointingMs: 100, // measured best for the band's mic in vexo-open-kit/docs/deepgram.md
+  },
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY ?? "",
+    model: process.env.OPENAI_MODEL || "gpt-6-luna", // the Vexo kit's default: small, fast, cheap
+  },
+  vexo: {
+    // The team's band (Vexo-HACK-26). The ONE place this number lives; the page reads it from /api/config.
+    // Never change it to another team's band.
+    band: 26,
+    kitDir: path.resolve("vexo-open-kit"),
+  },
 };
