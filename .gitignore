@@ -1,0 +1,10 @@
+node_modules/
+# secrets: never commit any env file except the blank template
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# generated audio / caches
+.cache/
+out/

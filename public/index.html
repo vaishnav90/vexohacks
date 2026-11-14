@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Relay — crew coordination</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="dot" id="conn"></span>RELAY <small>crew task coordination</small></div>
+    <div class="usage" id="usage">MiniMax —</div>
+  </header>
+
+  <main>
+    <section class="panel tasks">
+      <h2>Tasks</h2>
+      <div class="placeholder">
+        Task board connects next: voice → Deepgram → command → tasks here.<br />
+        Pending · Accepted · Reported done · Corrections
+      </div>
+    </section>
+
+    <section class="panel voice">
+      <div class="voice-head">
+        <h2>Relay Voice <small>MiniMax → earpiece</small></h2>
+        <button id="earpiece" class="toggle" aria-pressed="false">🔇 Earpiece off</button>
+      </div>
+      <div id="now" class="now idle">Silent</div>
+      <ol id="log" class="log"></ol>
+
+      <details class="console" open>
+        <summary>Voice test console</summary>
+        <div class="samples">
+          <button data-kind="taskAssigned">Task assigned</button>
+          <button data-kind="taskAccepted">Accepted</button>
+          <button data-kind="taskCompleted">Completed</button>
+          <button data-kind="timerStarted">Timer started</button>
+          <button data-kind="timerExpired">Timer expired</button>
+          <button data-kind="correction">Correction</button>
+          <button data-kind="clarify">Clarify</button>
+          <button data-kind="handoff">Handoff</button>
+        </div>
+        <form id="custom">
+          <input id="text" maxlength="3000" placeholder="Type anything for Relay to say…" />
+          <button type="submit">Speak</button>
+        </form>
+        <div id="err" class="err" hidden></div>
+      </details>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
