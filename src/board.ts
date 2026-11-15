@@ -72,15 +72,22 @@ export class TaskBoard {
     return structuredClone(this.add(null, person.trim(), description, "sent", `from ${displayName(fromCrewId.toLowerCase())}`));
   }
 
-  /** Double-tap: the most recently assigned pending task is accepted (same rule as BandService). */
+  /** Double-tap (legacy): the most recently assigned pending task is accepted. */
   accepted(crewId: string): BoardTask | null {
     const t = this.latest(crewId, "pending");
     return t ? this.move(t, "accepted", "accepted") : null;
   }
 
+  /** Double-tap with explicit selection: accept a specific pending task by ID. */
+  acceptedById(taskId: string): BoardTask | null {
+    const t = this.tasks.find((x) => x.id === taskId && x.status === "pending");
+    return t ? this.move(t, "accepted", "accepted") : null;
+  }
+
   /** A result was reported: closes the accepted task, else a matching pending one, else records a new done task. */
-  completed(crewId: string, description: string | undefined, result: string | undefined): BoardTask {
+  completed(crewId: string, description: string | undefined, result: string | undefined, taskId?: string): BoardTask {
     const t =
+      (taskId ? this.tasks.find((x) => x.id === taskId && (x.status === "accepted" || x.status === "pending")) : undefined) ??
       this.latest(crewId, "accepted") ??
       (description ? this.latest(crewId, "pending", description) : undefined);
     const target = t ?? this.add(crewId.toLowerCase(), displayName(crewId.toLowerCase()), description?.trim() || "Task", "assigned");

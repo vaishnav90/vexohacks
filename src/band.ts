@@ -95,16 +95,16 @@ export class BandService {
    * Called when the band wearer double-taps to acknowledge a pending task.
    * Returns null if there is no pending task (tap is ignored).
    */
-  handleTap(crewId: string): NotifyResult | null {
+  handleTap(crewId: string, task?: string): NotifyResult | null {
     const id = crewId.toLowerCase();
     if (!(id in this.crewToBand)) return null;
-    const task = this.pending.get(id);
-    if (!task) return null;
+    const taskToAccept = task ?? this.pending.get(id);
+    if (!taskToAccept) return null;
     this.pending.delete(id);
-    this.lastTask.set(id, task); // remember so completed state can reference it
+    this.lastTask.set(id, taskToAccept);
     return {
       ledCommand: { ...LED.acknowledged },
-      voiceText: phrases.taskAccepted(task, displayName(id)),
+      voiceText: phrases.taskAccepted(taskToAccept, displayName(id)),
     };
   }
 }

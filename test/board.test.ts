@@ -63,4 +63,33 @@ describe("TaskBoard", () => {
     b.list()[0].status = "done";
     expect(b.list()[0].status).toBe("pending");
   });
+
+  it("acceptedById accepts the specific pending task regardless of order", () => {
+    const b = make();
+    b.assigned("vaishnav", "repeat blood pressure");
+    b.assigned("vaishnav", "check glucose");
+    const firstId = b.list()[0].id;
+    const c = b.acceptedById(firstId);
+    expect(c).toMatchObject({ id: firstId, description: "repeat blood pressure", status: "accepted" });
+    expect(b.list().find((x) => x.description === "check glucose")?.status).toBe("pending");
+  });
+
+  it("acceptedById returns null for a non-existent or already-accepted task", () => {
+    const b = make();
+    b.assigned("vaishnav", "repeat blood pressure");
+    b.accepted("vaishnav");
+    expect(b.acceptedById("T1")).toBeNull();
+    expect(b.acceptedById("T999")).toBeNull();
+  });
+
+  it("completed with taskId closes the specific task regardless of accepted order", () => {
+    const b = make();
+    b.assigned("vaishnav", "repeat blood pressure");
+    b.assigned("vaishnav", "check glucose");
+    b.acceptedById("T1");
+    b.acceptedById("T2");
+    const c = b.completed("vaishnav", undefined, "glucose 95", "T2");
+    expect(c).toMatchObject({ id: "T2", description: "check glucose", status: "done", result: "glucose 95" });
+    expect(b.list().find((x) => x.id === "T1")?.status).toBe("accepted");
+  });
 });

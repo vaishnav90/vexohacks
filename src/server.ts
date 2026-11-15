@@ -133,13 +133,13 @@ function setLed(crewId: string, led: LedCommand) {
 }
 
 /** Mirror a band lifecycle event onto the dashboard: task ledger, band LED, and alerts. */
-function recordBand(crewId: string, state: BandState, led: LedCommand, p: { task?: string; person?: string; label?: string; what?: string; result?: string }) {
+function recordBand(crewId: string, state: BandState, led: LedCommand, p: { task?: string; person?: string; label?: string; what?: string; result?: string; taskId?: string }) {
   setLed(crewId, led);
   const at = new Date().toISOString();
   const name = crewId.charAt(0).toUpperCase() + crewId.slice(1);
   if (state === "assigned" && p.task) board.assigned(crewId, p.task.trim());
   else if (state === "taskSent" && p.task && p.person) board.sent(crewId, p.person, p.task.trim());
-  else if (state === "completed") board.completed(crewId, typeof p.task === "string" ? p.task.trim() || undefined : undefined, typeof p.result === "string" ? p.result : undefined);
+  else if (state === "completed") board.completed(crewId, typeof p.task === "string" ? p.task.trim() || undefined : undefined, typeof p.result === "string" ? p.result : undefined, p.taskId);
   else if (state === "timerExpired") broadcast("band_alert", { crewId, name, kind: "timer", text: p.label ? `${name}: ${p.label} timer is up` : `${name}: timer is up`, at });
   else if (state === "clarify") broadcast("band_alert", { crewId, name, kind: "clarify", text: `Relay asked to repeat: ${p.what || "that"}`, at });
   broadcast("board", { tasks: board.list() });
@@ -152,7 +152,11 @@ app.post("/api/band/:crewId/notify", async (req, res) => {
   const crewId = req.params.crewId.toLowerCase();
   if (!bandService.hasCrew(crewId)) return res.status(404).json({ error: `No band assigned to '${crewId}'` });
 
-  const { state, task, person, label, what, result: taskResult } = req.body ?? {};
+  const { state, task: rawTask, person, label, what, result: taskResult, taskId } = req.body ?? {};
+  // For completed state, resolve task description from board if taskId is given but task is not.
+  const task = (state === "completed" && !rawTask && taskId)
+    ? board.list().find((t) => t.id === taskId)?.description ?? rawTask
+    : rawTask;
   if (!BAND_STATES.includes(state)) {
     return res.status(400).json({ error: `state must be one of: ${BAND_STATES.join(", ")}` });
   }
@@ -167,7 +171,7 @@ app.post("/api/band/:crewId/notify", async (req, res) => {
   if (!result) return res.status(500).json({ error: "notify failed" });
 
   broadcast("band_notify", { crewId, ...result.ledCommand });
-  recordBand(crewId, state as BandState, result.ledCommand, { task, person, label, what, result: taskResult });
+  recordBand(crewId, state as BandState, result.ledCommand, { task, person, label, what, result: taskResult, taskId });
   try {
     await say(result.voiceText, `band_${state}`);
     res.json({ ok: true });
@@ -177,20 +181,28 @@ app.post("/api/band/:crewId/notify", async (req, res) => {
 });
 
 // Called by band_bridge.py when the wearer double-taps to acknowledge a pending task.
+// Optionally accepts { taskId } in the body to accept a specific task by ID.
 app.post("/api/band/:crewId/tap", async (req, res) => {
   const crewId = req.params.crewId.toLowerCase();
   if (!bandService.hasCrew(crewId)) return res.status(404).json({ error: `No band assigned to '${crewId}'` });
 
-  const result = bandService.handleTap(crewId);
+  const taskId: string | undefined = typeof req.body?.taskId === "string" ? req.body.taskId : undefined;
+  // Look up the task description so the voice line uses the real task name.
+  const taskDescription = taskId
+    ? board.list().find((t) => t.id === taskId && t.status === "pending")?.description
+    : undefined;
+
+  const result = bandService.handleTap(crewId, taskDescription);
   if (!result) return res.json({ ok: true, acknowledged: false });
 
   broadcast("band_notify", { crewId, ...result.ledCommand });
   setLed(crewId, result.ledCommand);
-  board.accepted(crewId);
+  if (taskId) board.acceptedById(taskId);
+  else board.accepted(crewId);
   broadcast("board", { tasks: board.list() });
   try {
     await say(result.voiceText, "band_acknowledged");
-    res.json({ ok: true, acknowledged: true });
+    res.json({ ok: true, acknowledged: true, taskId: taskId ?? null });
   } catch (err) {
     sendError(res, err);
   }
