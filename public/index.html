@@ -3,52 +3,109 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Relay — crew coordination</title>
+  <title>Relay — voice-controlled crew coordination</title>
+  <meta name="description" content="Relay is a voice-controlled wearable that helps EMS crews coordinate care without reaching for a screen." />
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
-<body>
-  <header>
-    <div class="brand"><span class="dot" id="conn"></span>RELAY <small>crew task coordination</small></div>
-    <div class="usage" id="usage">MiniMax —</div>
-  </header>
+<body class="landing">
+  <nav class="topbar">
+    <a class="brand" href="/"><span class="dot live"></span>Relay</a>
+    <div class="controls">
+      <a class="navlink" href="#how">How it works</a>
+      <a class="navlink" href="#band">The band</a>
+      <a class="btn primary" href="/board.html">Open crew board →</a>
+    </div>
+  </nav>
 
-  <main>
-    <section class="panel tasks">
-      <h2>Tasks</h2>
-      <div class="placeholder">
-        Task board connects next: voice → Deepgram → command → tasks here.<br />
-        Pending · Accepted · Reported done · Corrections
+  <div class="page">
+    <header class="hero">
+      <div class="eyebrow">Relay · for EMS crews</div>
+      <h1>Who's doing what.<br />What's done.<br />What still needs attention.</h1>
+      <p class="lede">Relay is a voice-controlled wearable that helps EMS crews coordinate care without reaching for a screen. Medics assign tasks out loud, the right teammate's band lights up, and Relay tracks each task until it's reported done.</p>
+      <div class="cta-row">
+        <a class="btn primary big" href="/board.html">Open crew board →</a>
+        <a class="btn big" href="#how">See how it works</a>
       </div>
-    </section>
+    </header>
 
-    <section class="panel voice">
-      <div class="voice-head">
-        <h2>Relay Voice <small>MiniMax → earpiece</small></h2>
-        <button id="earpiece" class="toggle" aria-pressed="false">🔇 Earpiece off</button>
+    <section class="quick">
+      <div class="quick-text">
+        <h2>One sentence in. The right band lights up.</h2>
+        <p>Relay turns what the crew says into tasks with an owner and a status. Not just a transcript: every request is tracked from assignment to acceptance to a reported result.</p>
+        <p class="hint">Pick a step to see what Relay does.</p>
       </div>
-      <div id="now" class="now idle">Silent</div>
-      <ol id="log" class="log"></ol>
-
-      <details class="console" open>
-        <summary>Voice test console</summary>
-        <div class="samples">
-          <button data-kind="taskAssigned">Task assigned</button>
-          <button data-kind="taskAccepted">Accepted</button>
-          <button data-kind="taskCompleted">Completed</button>
-          <button data-kind="timerStarted">Timer started</button>
-          <button data-kind="timerExpired">Timer expired</button>
-          <button data-kind="correction">Correction</button>
-          <button data-kind="clarify">Clarify</button>
-          <button data-kind="handoff">Handoff</button>
+      <div class="quick-demo">
+        <div class="tabs" role="tablist">
+          <button role="tab" class="tab" data-step="assign" aria-selected="true">Assign</button>
+          <button role="tab" class="tab" data-step="accept" aria-selected="false">Accept</button>
+          <button role="tab" class="tab" data-step="report" aria-selected="false">Report</button>
+          <button role="tab" class="tab" data-step="send" aria-selected="false">Send</button>
+          <button role="tab" class="tab" data-step="timer" aria-selected="false">Timer</button>
         </div>
-        <form id="custom">
-          <input id="text" maxlength="3000" placeholder="Type anything for Relay to say…" />
-          <button type="submit">Speak</button>
-        </form>
-        <div id="err" class="err" hidden></div>
-      </details>
+        <dl class="flow" id="flow"></dl>
+      </div>
     </section>
-  </main>
-  <script src="/app.js"></script>
+
+    <section class="features">
+      <article class="feature">
+        <div class="art art-1"></div>
+        <h3>Assign by voice</h3>
+        <p>“Assign repeat blood pressure to Vaishnav.” Relay works out what the task is, puts it on the board, and confirms it out loud through MiniMax.</p>
+      </article>
+      <article class="feature">
+        <div class="art art-2"></div>
+        <h3>Private band alerts</h3>
+        <p>Only the assignee's band lights up, with a colour that means something: orange for a new task, red for a timer, purple when Relay needs you to repeat.</p>
+      </article>
+      <article class="feature">
+        <div class="art art-3"></div>
+        <h3>Tracked to done</h3>
+        <p>A double-tap on the band accepts the task. The reported result is linked back to the request, so the board shows what's pending, in progress, and reported done.</p>
+      </article>
+    </section>
+
+    <section class="how" id="how">
+      <div class="eyebrow">How it works</div>
+      <h2 class="section-title">From voice to band in five steps</h2>
+      <ol class="pipeline">
+        <li><span class="n">01</span><strong>Speak</strong><span>The coordinator talks naturally into the laptop mic or band.</span></li>
+        <li><span class="n">02</span><strong>Deepgram</strong><span>Turns speech into text in real time.</span></li>
+        <li><span class="n">03</span><strong>OpenAI</strong><span>Reads the sentence and picks one action: assign a task, send it to a teammate, report a result, flag a timer, or ask to repeat.</span></li>
+        <li><span class="n">04</span><strong>Relay server</strong><span>Keeps the task list in code, never in the AI model, and decides what happens.</span></li>
+        <li><span class="n">05</span><strong>Band + voice</strong><span>The assignee's band lights up and MiniMax speaks a short confirmation.</span></li>
+      </ol>
+      <p class="note">Relay only says what actually happened: every spoken confirmation is built from the task state, not written by the AI.</p>
+    </section>
+
+    <section class="band-legend" id="band">
+      <div class="eyebrow">The band</div>
+      <h2 class="section-title">Every light means one thing</h2>
+      <div class="legend">
+        <div class="legend-item"><span class="lamp blink" style="--led:#ff8800;--period:500ms"></span><div><strong>Orange blink</strong><span>New task for you, waiting for a double-tap.</span></div></div>
+        <div class="legend-item"><span class="lamp" style="--led:#00ff00"></span><div><strong>Green</strong><span>You accepted the task.</span></div></div>
+        <div class="legend-item"><span class="lamp" style="--led:#00ffff"></span><div><strong>Cyan</strong><span>Your result was logged.</span></div></div>
+        <div class="legend-item"><span class="lamp blink" style="--led:#ff0000;--period:200ms"></span><div><strong>Red fast blink</strong><span>Your timer is up.</span></div></div>
+        <div class="legend-item"><span class="lamp blink" style="--led:#8800ff;--period:800ms"></span><div><strong>Purple blink</strong><span>Relay didn't catch that. Please repeat.</span></div></div>
+        <div class="legend-item"><span class="lamp" style="--led:#ffffff"></span><div><strong>White</strong><span>Your task was sent to a teammate.</span></div></div>
+      </div>
+    </section>
+
+    <section class="final">
+      <h2>Watch the crew board live</h2>
+      <p class="lede">Tasks move from pending to done as the crew talks.</p>
+      <a class="btn primary big" href="/board.html">Open crew board →</a>
+    </section>
+
+    <footer class="foot">
+      <span>Relay</span>
+      <span class="hint">Deepgram · OpenAI · MiniMax · Vexo Band</span>
+    </footer>
+  </div>
+
+  <script src="/home.js"></script>
 </body>
 </html>

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crew board — Relay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <nav class="topbar">
+    <a class="brand" href="/"><span class="dot" id="conn" title="Server connection"></span>Relay</a>
+    <div class="controls">
+      <span class="usage" id="usage">MiniMax —</span>
+      <button id="earpiece" class="toggle" aria-pressed="false" title="The server already plays every line on this laptop's speakers. Turn this on to also play it in this browser tab (e.g. on another device).">🔇 Browser audio off</button>
+    </div>
+  </nav>
+
+  <div class="page">
+    <header class="hero">
+      <div class="eyebrow">Live call</div>
+      <h1>Crew board</h1>
+      <p class="lede">Who's doing what, what's reported done, and what still needs attention.</p>
+    </header>
+
+    <section class="strip">
+      <div class="bands" id="bands"></div>
+      <div class="now-wrap">
+        <div class="live-label accent">Relay</div>
+        <div id="now" class="now idle">Silent</div>
+      </div>
+    </section>
+
+    <div id="alerts" class="alerts"></div>
+
+    <section class="board-wrap">
+      <div class="board-head"><h2>Tasks</h2></div>
+      <div class="board">
+        <div class="col" data-status="pending">
+          <div class="col-head"><span class="pip pending"></span>Pending <span class="count" id="count-pending">0</span></div>
+          <ol id="col-pending" class="cards"></ol>
+          <div class="empty">Assigned tasks wait here until the crew member double-taps their band.</div>
+        </div>
+        <div class="col" data-status="accepted">
+          <div class="col-head"><span class="pip accepted"></span>Accepted <span class="count" id="count-accepted">0</span></div>
+          <ol id="col-accepted" class="cards"></ol>
+          <div class="empty">Double-tap on the band accepts the task.</div>
+        </div>
+        <div class="col" data-status="done">
+          <div class="col-head"><span class="pip done"></span>Reported done <span class="count" id="count-done">0</span></div>
+          <ol id="col-done" class="cards"></ol>
+          <div class="empty">Reported results land here, e.g. “BP 110 over 70.”</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tiles">
+      <article class="tile">
+        <div class="tile-head"><h3>Relay voice</h3><span class="hint">MiniMax · spoken confirmations</span></div>
+        <ol id="log" class="log"></ol>
+        <div class="empty">Spoken confirmations appear here.</div>
+        <div id="err" class="err" hidden></div>
+      </article>
+      <article class="tile">
+        <div class="tile-head"><h3>Band activity</h3><span class="hint">LED commands sent to bands</span></div>
+        <ol id="band-log" class="band-log"></ol>
+        <div class="empty">Band lights and taps appear here.</div>
+      </article>
+      <article class="tile">
+        <div class="tile-head"><h3>Voice test</h3><span class="hint">speaks through MiniMax</span></div>
+        <div class="samples">
+          <button data-kind="taskAssigned">Task assigned</button>
+          <button data-kind="taskAccepted">Accepted</button>
+          <button data-kind="taskCompleted">Completed</button>
+          <button data-kind="timerStarted">Timer started</button>
+          <button data-kind="timerExpired">Timer expired</button>
+          <button data-kind="correction">Correction</button>
+          <button data-kind="clarify">Clarify</button>
+          <button data-kind="handoff">Handoff</button>
+        </div>
+        <form id="custom">
+          <input id="text" maxlength="3000" placeholder="Type anything for Relay to say…" autocomplete="off" />
+          <button type="submit">Speak</button>
+        </form>
+      </article>
+    </section>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

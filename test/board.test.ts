@@ -1,0 +1,66 @@
+import { describe, it, expect } from "vitest";
+import { TaskBoard } from "../src/board.js";
+
+let t = 0;
+const clock = () => new Date(Date.UTC(2026, 10, 14, 12, 0, t++));
+const make = () => new TaskBoard(clock);
+
+describe("TaskBoard", () => {
+  it("assigned -> pending card for the band wearer", () => {
+    const b = make();
+    const c = b.assigned("vaishnav", "repeat blood pressure");
+    expect(c).toMatchObject({ id: "T1", crewId: "vaishnav", assignee: "Vaishnav", description: "repeat blood pressure", status: "pending", result: null });
+  });
+
+  it("tap moves the latest pending card for that crew to accepted", () => {
+    const b = make();
+    b.assigned("vaishnav", "old task");
+    b.assigned("vaishnav", "repeat blood pressure");
+    const c = b.accepted("vaishnav");
+    expect(c?.description).toBe("repeat blood pressure");
+    expect(c?.status).toBe("accepted");
+    expect(b.list().find((x) => x.description === "old task")?.status).toBe("pending");
+  });
+
+  it("tap with nothing pending changes nothing", () => {
+    const b = make();
+    expect(b.accepted("vaishnav")).toBeNull();
+    expect(b.list()).toHaveLength(0);
+  });
+
+  it("completed closes the accepted card and records the result", () => {
+    const b = make();
+    b.assigned("vaishnav", "repeat blood pressure");
+    b.accepted("vaishnav");
+    const c = b.completed("vaishnav", undefined, "BP 110 over 70");
+    expect(c).toMatchObject({ id: "T1", status: "done", result: "BP 110 over 70" });
+    expect(c.history.map((h) => h.kind)).toEqual(["assigned", "accepted", "completed"]);
+  });
+
+  it("completed without an accept closes the matching pending card", () => {
+    const b = make();
+    b.assigned("vaishnav", "repeat blood pressure");
+    const c = b.completed("vaishnav", "repeat blood pressure", "BP 120 over 80");
+    expect(c).toMatchObject({ id: "T1", status: "done" });
+    expect(b.list()).toHaveLength(1);
+  });
+
+  it("completed with no matching card adds a done card", () => {
+    const b = make();
+    const c = b.completed("vaishnav", "glucose check", "glucose 95");
+    expect(c).toMatchObject({ status: "done", description: "glucose check", result: "glucose 95" });
+  });
+
+  it("taskSent creates a pending card for the named person", () => {
+    const b = make();
+    const c = b.sent("vaishnav", "Alex", "start IV");
+    expect(c).toMatchObject({ assignee: "Alex", crewId: null, status: "pending", description: "start IV" });
+  });
+
+  it("list returns copies so callers cannot mutate state", () => {
+    const b = make();
+    b.assigned("vaishnav", "x");
+    b.list()[0].status = "done";
+    expect(b.list()[0].status).toBe("pending");
+  });
+});

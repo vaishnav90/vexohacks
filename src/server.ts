@@ -6,10 +6,21 @@ import { config } from "./config.js";
 import { VoiceService, type SpokenLine } from "./voice.js";
 import { phrases } from "./phrases.js";
 import { MAX_TEXT_CHARS } from "./minimax.js";
-import { BandService, type BandState } from "./band.js";
+import { BandService, type BandState, type LedCommand } from "./band.js";
+import { TaskBoard } from "./board.js";
 
 const voice = new VoiceService({ ...config.minimax });
 const bandService = new BandService(config.bandCrew);
+// Dashboard state: task ledger + each band's current LED, so a page that opens mid-call sees everything.
+const board = new TaskBoard();
+const bandLeds = new Map<string, LedCommand & { at: string }>();
+const bands = () =>
+  Object.entries(config.bandCrew).map(([crewId, band]) => ({
+    crewId: crewId.toLowerCase(),
+    name: crewId.charAt(0).toUpperCase() + crewId.slice(1),
+    band,
+    led: bandLeds.get(crewId.toLowerCase()) ?? null,
+  }));
 const app = express();
 app.use(express.json({ limit: "64kb" }));
 app.use(express.static(path.resolve("public")));
@@ -26,7 +37,7 @@ function broadcast(event: string, data: unknown) {
 app.get("/api/events", (req, res) => {
   res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
   res.flushHeaders();
-  res.write(`event: snapshot\ndata: ${JSON.stringify({ voiceLog })}\n\n`);
+  res.write(`event: snapshot\ndata: ${JSON.stringify({ voiceLog, tasks: board.list(), bands: bands() })}\n\n`);
   clients.add(res);
   const ping = setInterval(() => res.write(": ping\n\n"), 20000);
   req.on("close", () => {
@@ -113,6 +124,24 @@ app.post("/api/voice/sample/:kind", async (req, res) => {
   }
 });
 
+function setLed(crewId: string, led: LedCommand) {
+  bandLeds.set(crewId, { ...led, at: new Date().toISOString() });
+  broadcast("bands", { bands: bands() });
+}
+
+/** Mirror a band lifecycle event onto the dashboard: task ledger, band LED, and alerts. */
+function recordBand(crewId: string, state: BandState, led: LedCommand, p: { task?: string; person?: string; label?: string; what?: string; result?: string }) {
+  setLed(crewId, led);
+  const at = new Date().toISOString();
+  const name = crewId.charAt(0).toUpperCase() + crewId.slice(1);
+  if (state === "assigned" && p.task) board.assigned(crewId, p.task.trim());
+  else if (state === "taskSent" && p.task && p.person) board.sent(crewId, p.person, p.task.trim());
+  else if (state === "completed") board.completed(crewId, typeof p.task === "string" ? p.task.trim() || undefined : undefined, typeof p.result === "string" ? p.result : undefined);
+  else if (state === "timerExpired") broadcast("band_alert", { crewId, name, kind: "timer", text: p.label ? `${name}: ${p.label} timer is up` : `${name}: timer is up`, at });
+  else if (state === "clarify") broadcast("band_alert", { crewId, name, kind: "clarify", text: `Relay asked to repeat: ${p.what || "that"}`, at });
+  broadcast("board", { tasks: board.list() });
+}
+
 const BAND_STATES: BandState[] = ["assigned", "timerExpired", "clarify", "taskSent", "completed"];
 
 // Called by teammates' code when a task lifecycle event targets this crew member.
@@ -135,6 +164,7 @@ app.post("/api/band/:crewId/notify", async (req, res) => {
   if (!result) return res.status(500).json({ error: "notify failed" });
 
   broadcast("band_notify", { crewId, ...result.ledCommand });
+  recordBand(crewId, state as BandState, result.ledCommand, { task, person, label, what, result: taskResult });
   try {
     await say(result.voiceText, `band_${state}`);
     res.json({ ok: true });
@@ -152,6 +182,9 @@ app.post("/api/band/:crewId/tap", async (req, res) => {
   if (!result) return res.json({ ok: true, acknowledged: false });
 
   broadcast("band_notify", { crewId, ...result.ledCommand });
+  setLed(crewId, result.ledCommand);
+  board.accepted(crewId);
+  broadcast("board", { tasks: board.list() });
   try {
     await say(result.voiceText, "band_acknowledged");
     res.json({ ok: true, acknowledged: true });
