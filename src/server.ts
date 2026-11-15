@@ -1,12 +1,15 @@
 import express, { type Response } from "express";
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { config } from "./config.js";
 import { VoiceService, type SpokenLine } from "./voice.js";
 import { phrases } from "./phrases.js";
 import { MAX_TEXT_CHARS } from "./minimax.js";
+import { BandService, type BandState } from "./band.js";
 
 const voice = new VoiceService({ ...config.minimax });
+const bandService = new BandService(config.bandCrew);
 const app = express();
 app.use(express.json({ limit: "64kb" }));
 app.use(express.static(path.resolve("public")));
@@ -49,6 +52,8 @@ export async function say(text: string, kind = "custom"): Promise<SpokenLine> {
   if (voiceLog.length > 200) voiceLog.shift();
   broadcast("spoken", line);
   broadcast("usage", await voice.usage());
+  // Play audio through the laptop speakers (macOS afplay, fire-and-forget)
+  spawn("afplay", [voice.audioPath(r.id)], { stdio: "ignore" });
   return line;
 }
 
@@ -108,7 +113,55 @@ app.post("/api/voice/sample/:kind", async (req, res) => {
   }
 });
 
+const BAND_STATES: BandState[] = ["assigned", "timerExpired", "clarify", "taskSent", "completed"];
+
+// Called by teammates' code when a task lifecycle event targets this crew member.
+app.post("/api/band/:crewId/notify", async (req, res) => {
+  const crewId = req.params.crewId.toLowerCase();
+  if (!bandService.hasCrew(crewId)) return res.status(404).json({ error: `No band assigned to '${crewId}'` });
+
+  const { state, task, person, label, what, result: taskResult } = req.body ?? {};
+  if (!BAND_STATES.includes(state)) {
+    return res.status(400).json({ error: `state must be one of: ${BAND_STATES.join(", ")}` });
+  }
+  if ((state === "assigned" || state === "taskSent") && (!task || typeof task !== "string" || !task.trim())) {
+    return res.status(400).json({ error: "task is required for assigned/taskSent states" });
+  }
+  if (state === "taskSent" && (!person || typeof person !== "string" || !person.trim())) {
+    return res.status(400).json({ error: "person is required for taskSent state" });
+  }
+
+  const result = bandService.notify(crewId, state as BandState, { task, person, label, what, result: taskResult });
+  if (!result) return res.status(500).json({ error: "notify failed" });
+
+  broadcast("band_notify", { crewId, ...result.ledCommand });
+  try {
+    await say(result.voiceText, `band_${state}`);
+    res.json({ ok: true });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+// Called by band_bridge.py when the wearer double-taps to acknowledge a pending task.
+app.post("/api/band/:crewId/tap", async (req, res) => {
+  const crewId = req.params.crewId.toLowerCase();
+  if (!bandService.hasCrew(crewId)) return res.status(404).json({ error: `No band assigned to '${crewId}'` });
+
+  const result = bandService.handleTap(crewId);
+  if (!result) return res.json({ ok: true, acknowledged: false });
+
+  broadcast("band_notify", { crewId, ...result.ledCommand });
+  try {
+    await say(result.voiceText, "band_acknowledged");
+    res.json({ ok: true, acknowledged: true });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
 app.listen(config.port, () => {
   console.log(`Relay running at http://localhost:${config.port}`);
   console.log(`MiniMax model=${config.minimax.model} voice=${config.minimax.voiceId} key=${config.minimax.apiKey ? "set" : "MISSING"}`);
+  console.log(`Band crew: ${JSON.stringify(config.bandCrew)}`);
 });

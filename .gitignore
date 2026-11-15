@@ -8,3 +8,8 @@ node_modules/
 # generated audio / caches
 .cache/
 out/
+# third-party kit (separate git repo — not committed here)
+vexo-open-kit/
+# scratch files
+first.py
+.gitignore.backup
