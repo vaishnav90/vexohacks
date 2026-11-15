@@ -52,6 +52,39 @@ SERVER_URL = "http://localhost:3000"
 CREW_ID = "vaishnav"          # only crew member with a band right now
 SAMPLE_RATE = 16000           # Deepgram expects 16 kHz mono
 
+# ── speaking suppression ─────────────────────────────────────────────────────
+_server_speaking = False  # True while afplay is running on the server
+
+
+def _speaking_guard_loop() -> None:
+    """Background thread: watches SSE speaking_start/end to suppress mic feedback."""
+    global _server_speaking
+    import time as _time
+    while True:
+        _server_speaking = False
+        try:
+            req = urllib.request.Request(f"{SERVER_URL}/api/events")
+            with urllib.request.urlopen(req, timeout=None) as resp:
+                event_name = ""
+                while True:
+                    raw = resp.readline()
+                    if not raw:
+                        break
+                    line = raw.decode("utf-8").rstrip("\r\n")
+                    if line.startswith("event:"):
+                        event_name = line[6:].strip()
+                    elif line.startswith("data:"):
+                        if event_name == "speaking_start":
+                            _server_speaking = True
+                        elif event_name == "speaking_end":
+                            _server_speaking = False
+                        event_name = ""
+                    elif line == "" or line.startswith(":"):
+                        event_name = ""
+        except Exception:
+            pass
+        _time.sleep(3)
+
 # ── intent tools (same set as band_bridge.py) ────────────────────────────────
 _INTENT_TOOLS = [
     ai.tool("assigned",    "Assign a medical task to Vaishnav",                       task="string"),
@@ -84,6 +117,9 @@ def _dispatch(text: str) -> None:
     """Parse intent from text and POST the matching band command to the server."""
     text = text.strip()
     if not text:
+        return
+    if _server_speaking:
+        print(f"[intent] suppressed (server speaking): {text!r}")
         return
     print(f"[intent] parsing: {text!r}")
     try:
@@ -127,12 +163,14 @@ def _run_mic_mode() -> None:
         )
         sys.exit(1)
 
-    def _on_transcript(text: str, final: bool) -> None:
-        if final and text.strip():
-            print(f"[speech] heard: {text!r}")
-            threading.Thread(target=_dispatch, args=(text,), daemon=True).start()
-
     def _run_session() -> None:
+        # Only print partials for feedback; dispatch once at the end with the
+        # full transcript so Deepgram's mid-sentence utterance splits don't
+        # create multiple tasks from a single spoken command.
+        def _on_transcript(text: str, final: bool) -> None:
+            if text.strip():
+                print(f"[speech] {'heard' if final else '...'}: {text!r}")
+
         ears = speech.create(send="pcm").start(_on_transcript)
 
         def _audio_cb(indata, frames, time_info, status):
@@ -152,7 +190,8 @@ def _run_mic_mode() -> None:
 
         final_text = ears.stop()
         if final_text.strip():
-            print(f"[speech] final: {final_text!r}")
+            print(f"[speech] dispatching full transcript: {final_text!r}")
+            _dispatch(final_text)
 
     while True:
         try:
@@ -164,6 +203,7 @@ def _run_mic_mode() -> None:
 
 
 def main() -> None:
+    threading.Thread(target=_speaking_guard_loop, daemon=True).start()
     say_text = None
     args = sys.argv[1:]
     if "--say" in args:

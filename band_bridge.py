@@ -120,6 +120,7 @@ _mic_active = False
 _mic_pending = False   # set by single-tap handler; consumed by main loop
 _ears = None           # active DeepgramSpeech session
 _queued_led = None     # LED command blocked by mic-on rule; replayed when mic turns off
+_server_speaking = False  # True while afplay is running on the server; mic is suppressed
 
 # Tools the AI chooses among when interpreting a transcript.
 _INTENT_TOOLS = [
@@ -151,6 +152,9 @@ _INTENT_INSTRUCTIONS = (
 
 def _dispatch_transcript(text: str) -> None:
     """Parse intent from a transcript and POST the matching band command to the server."""
+    if _server_speaking:
+        print(f"[intent] suppressed (server speaking): {text!r}")
+        return
     try:
         action, details = ai.choose(text, _INTENT_TOOLS, instructions=_INTENT_INSTRUCTIONS)
         if action == "none":
@@ -171,14 +175,9 @@ def _dispatch_transcript(text: str) -> None:
 
 
 def _on_transcript(text: str, final: bool) -> None:
-    """Called by Deepgram on each partial (final=False) or settled (final=True) transcript."""
-    if not final:
-        return
-    text = text.strip()
-    if not text:
-        return
-    print(f"[speech] heard: {text}")
-    threading.Thread(target=_dispatch_transcript, args=(text,), daemon=True).start()
+    """Print live feedback only — dispatching happens once in _stop_mic."""
+    if text.strip():
+        print(f"[speech] {'heard' if final else '...'}: {text}")
 
 
 def _start_mic(band: "Band") -> None:
@@ -192,14 +191,17 @@ def _start_mic(band: "Band") -> None:
 
 
 def _stop_mic(band: "Band") -> None:
-    """Turn the band microphone off, flush remaining transcript, replay any queued LED."""
+    """Turn the band microphone off, dispatch the full transcript once, replay any queued LED."""
     global _mic_active, _ears, _queued_led
     _mic_active = False
     print("[mic] off — processing last words...")
     band.configure(audio=False)
     band.off("audio", _ears.feed)
-    _ears.stop()
+    final_text = _ears.stop()
     _ears = None
+    if final_text.strip():
+        print(f"[speech] dispatching full transcript: {final_text!r}")
+        threading.Thread(target=_dispatch_transcript, args=(final_text,), daemon=True).start()
     # Replay any LED command that was blocked while the mic was on
     if _queued_led:
         cmd, _queued_led = _queued_led, None
@@ -233,8 +235,10 @@ def _sse_loop(band: "Band") -> None:
     server and drives the LED whenever a band_notify event arrives.
     Reconnects automatically on failure.
     """
+    global _server_speaking
     url = f"{SERVER_URL}/api/events"
     while True:
+        _server_speaking = False  # reset on reconnect so a stale True never locks the mic
         try:
             req = urllib.request.Request(url)
             with urllib.request.urlopen(req, timeout=None) as response:
@@ -254,6 +258,12 @@ def _sse_loop(band: "Band") -> None:
                                 _handle_band_notify(band, json.loads(data_str))
                             except Exception as e:
                                 print(f"[sse] parse error: {e}", file=sys.stderr)
+                        elif event_name == "speaking_start":
+                            _server_speaking = True
+                            print("[mic] server speaking — transcript dispatch suppressed")
+                        elif event_name == "speaking_end":
+                            _server_speaking = False
+                            print("[mic] server done speaking — transcript dispatch resumed")
                         event_name = ""
                     elif line == "" or line.startswith(":"):
                         event_name = ""  # blank line or ping — reset for next event

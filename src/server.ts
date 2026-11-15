@@ -63,8 +63,11 @@ export async function say(text: string, kind = "custom"): Promise<SpokenLine> {
   if (voiceLog.length > 200) voiceLog.shift();
   broadcast("spoken", line);
   broadcast("usage", await voice.usage());
-  // Play audio through the laptop speakers (macOS afplay, fire-and-forget)
-  spawn("afplay", [voice.audioPath(r.id)], { stdio: "ignore" });
+  // Play audio through the laptop speakers (macOS afplay, fire-and-forget).
+  // Broadcast speaking state so band_bridge.py can suppress mic input during playback.
+  broadcast("speaking_start", { lineId: line.id, durationMs: r.durationMs });
+  const player = spawn("afplay", [voice.audioPath(r.id)], { stdio: "ignore" });
+  player.on("close", () => broadcast("speaking_end", { lineId: line.id }));
   return line;
 }
 
