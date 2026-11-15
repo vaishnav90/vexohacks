@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Relay band bridge — connects band #26 (Vaishnav) to the Express server.
+Relay band bridge — connects band #26 (Chris) to the Express server.
 
 Usage:
     python3 band_bridge.py          # real Bluetooth band
@@ -60,7 +60,7 @@ import ai
 
 # ── constants ────────────────────────────────────────────────────────────────
 BAND = 26
-CREW_ID = "vaishnav"
+CREW_ID = "chris"
 SERVER_URL = "http://localhost:3000"
 MAX_PENDING_ANNOUNCED = 5  # how many tasks to read aloud before truncating
 
@@ -151,26 +151,26 @@ def _stop_mic(band: "Band") -> str:
 
 # ── intent / AI helpers ───────────────────────────────────────────────────────
 _INTENT_TOOLS = [
-    ai.tool("assigned",    "Assign a medical task to Vaishnav",                       task="string"),
-    ai.tool("timerExpired","A timer for Vaishnav has gone off",                       label="string"),
-    ai.tool("clarify",     "Ask Vaishnav to clarify something",                       what="string"),
-    ai.tool("taskSent",    "Vaishnav is sending a task to another crew member",       task="string", person="string"),
-    ai.tool("completed",   "Vaishnav is reporting the result of a completed task",    result="string"),
+    ai.tool("assigned",    "Assign a medical task to Chris",                       task="string"),
+    ai.tool("timerExpired","A timer for Chris has gone off",                       label="string"),
+    ai.tool("clarify",     "Ask Chris to clarify something",                       what="string"),
+    ai.tool("taskSent",    "Chris is sending a task to another crew member",       task="string", person="string"),
+    ai.tool("completed",   "Chris is reporting the result of a completed task",    result="string"),
     ai.tool("none",        "Nothing here is a band command — ignore this transcript"),
 ]
 
 _INTENT_INSTRUCTIONS = (
-    "You are dispatching commands for an EMS wristband worn by Vaishnav. "
+    "You are dispatching commands for an EMS wristband worn by Chris. "
     "This is an emergency medical setting. Rules:\n"
     "- 'assigned': any request to perform a clinical task. "
     "  'repeat blood pressure', 'can you repeat the BP', 'check vitals', 'get an IV' all map to assigned. "
     "  'repeat X' means perform X again — it is NOT clarify. "
     "  Task field: short clean description only, e.g. 'repeat blood pressure'. "
-    "  Strip 'hey Vaishnav', 'can you', 'please', 'assign', 'repeat' (when it means do-again) from the task.\n"
-    "- 'clarify': only when YOU (the system) need Vaishnav to repeat or explain an ambiguous instruction.\n"
+    "  Strip 'hey Chris', 'can you', 'please', 'assign', 'repeat' (when it means do-again) from the task.\n"
+    "- 'clarify': only when YOU (the system) need Chris to repeat or explain an ambiguous instruction.\n"
     "- 'timerExpired': a specific timer has gone off.\n"
-    "- 'taskSent': Vaishnav is handing a task to someone else.\n"
-    "- 'completed': Vaishnav is reporting a measurement or finding, e.g. 'blood pressure 120 over 80', 'pulse ox 98'. "
+    "- 'taskSent': Chris is handing a task to someone else.\n"
+    "- 'completed': Chris is reporting a measurement or finding, e.g. 'blood pressure 120 over 80', 'pulse ox 98'. "
     "  Result field: the measurement or finding exactly as spoken.\n"
     "- 'none': purely ambient speech — greetings, thanks, filler. No clinical action present.\n"
     "When in doubt between assigned and none, pick assigned."

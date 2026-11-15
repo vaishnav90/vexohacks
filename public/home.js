@@ -1,24 +1,24 @@
 // Home page: the "pick a step" demo. Static examples that mirror what the server actually does (src/band.ts).
 const STEPS = {
   assign: {
-    says: "Assign repeat blood pressure to Vaishnav.",
-    action: "assigned · task “repeat blood pressure” → Vaishnav",
+    says: "Assign repeat blood pressure to Chris.",
+    action: "assigned · task “repeat blood pressure” → Chris",
     band: { color: "#ff8800", blink: 500, label: "Orange blink: new task" },
-    voice: "Repeat blood pressure assigned to Vaishnav.",
+    voice: "Repeat blood pressure assigned to Chris.",
     board: "New card in Pending",
   },
   accept: {
-    says: "(Vaishnav double-taps the band)",
+    says: "(Chris double-taps the band)",
     action: "tap · latest pending task accepted",
     band: { color: "#00ff00", label: "Green for 3 seconds" },
-    voice: "Vaishnav accepted: repeat blood pressure.",
+    voice: "Chris accepted: repeat blood pressure.",
     board: "Card slides to Accepted",
   },
   report: {
     says: "Blood pressure 110 over 70.",
     action: "completed · result “110 over 70” linked to the task",
     band: { color: "#00ffff", label: "Cyan for 2 seconds" },
-    voice: "Vaishnav reports 110 over 70. Repeat blood pressure complete.",
+    voice: "Chris reports 110 over 70. Repeat blood pressure complete.",
     board: "Card slides to Reported done, with the result",
   },
   send: {
@@ -29,10 +29,10 @@ const STEPS = {
     board: "New card for Alex in Pending",
   },
   timer: {
-    says: "Vaishnav, two-minute timer is up.",
+    says: "Chris, two-minute timer is up.",
     action: "timerExpired · label “two-minute”",
     band: { color: "#ff0000", blink: 200, label: "Red fast blink" },
-    voice: "Vaishnav, two-minute timer is up.",
+    voice: "Chris, two-minute timer is up.",
     board: "Alert banner on the board",
   },
 };

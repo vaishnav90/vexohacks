@@ -2,7 +2,7 @@ import "dotenv/config";
 import path from "node:path";
 
 function parseBandCrew(raw: string | undefined): Record<string, number> {
-  if (!raw) return { vaishnav: 26 };
+  if (!raw) return { chris: 26 };
   try {
     return JSON.parse(raw) as Record<string, number>;
   } catch {

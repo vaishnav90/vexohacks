@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Impact report — Relay</title>
+  <meta name="description" content="How much does Relay help an EMS agency? This page shows the model's output, the math behind it, and how confident we are in each claim." />
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    /* ── impact page-specific styles ──────────────────────────────────── */
+    .impact-page { max-width: 900px; margin: 0 auto; padding: 56px 40px 100px; }
+
+    /* hero */
+    .impact-hero { margin-bottom: 60px; }
+    .impact-hero h1 { font-size: clamp(36px, 5vw, 60px); font-weight: 500; letter-spacing: -0.03em; line-height: 1.08; margin: 14px 0 16px; }
+    .impact-hero .lede { max-width: 64ch; }
+    .meta-row { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
+    .meta-pill { font: 11px var(--mono); color: var(--mute); background: var(--raised); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; }
+
+    /* big-number cards */
+    .stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 48px 0 72px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 24px 22px 20px; }
+    .stat-card .s-label { font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--mute); margin-bottom: 10px; }
+    .stat-card .s-num { font-size: 36px; font-weight: 500; letter-spacing: -0.025em; line-height: 1; color: var(--accent); }
+    .stat-card .s-unit { font-size: 15px; font-weight: 400; color: var(--ink-2); margin-left: 3px; }
+    .stat-card .s-range { font: 12px var(--mono); color: var(--mute); margin-top: 8px; }
+    .stat-card .s-sub { font-size: 14px; color: var(--ink-2); margin-top: 8px; line-height: 1.5; }
+    .stat-card.accent-bg { background: radial-gradient(130% 160% at 0% 0%, rgba(240,89,42,.18), transparent 70%), var(--surface); border-color: rgba(240,89,42,.3); }
+
+    /* section structure */
+    .impact-section { margin-top: 80px; }
+    .section-label { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+    .impact-section h2 { font-size: clamp(24px, 3vw, 36px); font-weight: 500; letter-spacing: -0.025em; margin: 0 0 10px; }
+    .impact-section > p, .impact-section .body-p { color: var(--ink-2); font-size: 17px; line-height: 1.65; margin: 0 0 20px; }
+    .impact-section h3 { font-size: 20px; font-weight: 500; margin: 36px 0 10px; }
+    .impact-section h4 { font-size: 16px; font-weight: 500; margin: 28px 0 8px; }
+
+    /* data tables */
+    .data-wrap { overflow-x: auto; margin: 24px 0; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .data-table th { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--mute); padding: 10px 16px; border-bottom: 1px solid var(--line); text-align: left; }
+    .data-table td { padding: 11px 16px; border-bottom: 1px solid var(--line); line-height: 1.5; vertical-align: top; }
+    .data-table tr:last-child td { border-bottom: 0; }
+    .data-table tr:hover td { background: var(--raised); }
+    .data-table .num { font: 14px var(--mono); color: var(--ink); }
+    .data-table .accent-num { font: 500 14px var(--mono); color: var(--accent); }
+    .data-table .green-num { font: 500 14px var(--mono); color: var(--green); }
+    .data-table .mute { color: var(--mute); font-size: 13px; }
+    .data-table .src { font: 11px var(--mono); color: var(--mute); }
+
+    /* table wrapper card */
+    .table-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; margin: 24px 0; }
+    .table-card .table-title { padding: 16px 20px 0; font-size: 14px; font-weight: 500; color: var(--ink-2); }
+    .table-card .data-wrap { margin: 12px 0 0; }
+
+    /* formula block */
+    .formula { background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; margin: 20px 0; overflow-x: auto; }
+    .formula pre { margin: 0; font: 13px/1.7 var(--mono); color: var(--ink-2); }
+    .formula pre .hi { color: var(--accent); }
+    .formula pre .hi2 { color: var(--green); }
+
+    /* progress-style completeness bars */
+    .completeness-grid { display: grid; gap: 10px; margin: 24px 0; }
+    .compl-row { background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+    .compl-labels { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+    .compl-name { font-size: 15px; font-weight: 500; }
+    .compl-vals { font: 12px var(--mono); color: var(--mute); }
+    .compl-vals .after { color: var(--green); font-weight: 500; }
+    .bar-track { height: 6px; background: var(--line-2); border-radius: 3px; position: relative; }
+    .bar-before { position: absolute; top: 0; left: 0; height: 6px; border-radius: 3px; background: var(--mute); }
+    .bar-after { position: absolute; top: 0; left: 0; height: 6px; border-radius: 3px; background: var(--green); opacity: 0.7; }
+
+    /* sensitivity bars */
+    .sens-table td.bar-cell { width: 200px; vertical-align: middle; }
+    .sens-bar-wrap { position: relative; height: 6px; background: var(--line-2); border-radius: 3px; }
+    .sens-bar { position: absolute; height: 6px; border-radius: 3px; background: var(--accent); opacity: .65; }
+
+    /* measured capture badges */
+    .capture-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 24px 0; }
+    .cap-card { background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+    .cap-card .cap-label { font: 11px var(--mono); color: var(--mute); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+    .cap-card .cap-score { font: 500 20px var(--mono); color: var(--green); }
+    .cap-card .cap-pct { font: 13px var(--mono); color: var(--mute); margin-left: 4px; }
+    .cap-card.perfect .cap-score { color: var(--green); }
+
+    /* confidence badges */
+    .conf-high { color: var(--green); font-weight: 500; }
+    .conf-med { color: var(--amber); font-weight: 500; }
+    .conf-low { color: var(--mute); font-weight: 500; }
+
+    /* callout boxes */
+    .callout { border-left: 2px solid var(--accent); padding: 14px 20px; background: var(--accent-soft); border-radius: 0 12px 12px 0; margin: 24px 0; }
+    .callout.green { border-color: var(--green); background: rgba(79,208,142,.07); }
+    .callout p { margin: 0; color: var(--ink-2); font-size: 15px; line-height: 1.65; }
+    .callout p strong { color: var(--ink); }
+
+    /* what-next list */
+    .next-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+    .next-list li { display: flex; gap: 16px; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; align-items: flex-start; }
+    .next-list .n { font: 500 12px var(--mono); color: var(--accent); flex: none; padding-top: 2px; }
+    .next-list p { margin: 0; font-size: 15px; line-height: 1.55; color: var(--ink-2); }
+    .next-list p strong { color: var(--ink); }
+
+    /* sources */
+    .sources { margin-top: 32px; }
+    .sources li { font-size: 14px; color: var(--ink-2); line-height: 1.65; margin-bottom: 12px; }
+    .sources a { color: var(--ink-2); }
+    .sources a:hover { color: var(--accent); }
+    .sources strong { color: var(--ink); }
+
+    /* divider */
+    .rule { border: 0; border-top: 1px solid var(--line); margin: 80px 0; }
+
+    /* interval table */
+    .interval-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin: 20px 0; }
+    .int-cell { background: var(--raised); padding: 18px 20px; }
+    .int-cell .int-label { font: 11px var(--mono); color: var(--mute); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .int-cell .int-val { font: 500 20px var(--mono); color: var(--ink); }
+    .int-cell .int-range { font: 12px var(--mono); color: var(--mute); margin-top: 4px; }
+    .int-cell.featured .int-val { color: var(--accent); }
+
+    @media (max-width: 1000px) {
+      .impact-page { padding: 32px 18px 60px; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .capture-grid { grid-template-columns: repeat(2, 1fr); }
+      .interval-row { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .stat-grid { grid-template-columns: 1fr; }
+      .capture-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body class="landing">
+
+  <nav class="topbar">
+    <a class="brand" href="/"><span class="dot"></span>Relay</a>
+    <div class="controls">
+      <a class="navlink" href="/">Home</a>
+      <a class="navlink" href="/board.html">Crew board</a>
+    </div>
+  </nav>
+
+  <div class="impact-page">
+
+    <!-- ── HERO ─────────────────────────────────────────────────── -->
+    <header class="impact-hero">
+      <div class="eyebrow">Relay · Impact report</div>
+      <h1>How much does<br/>Relay help an<br/>EMS agency?</h1>
+      <p class="lede">A financial and clinical model for a 10,000-transport agency. Numbers are medians with 80% intervals (P10–P90) over 10,000 simulated draws.</p>
+      <div class="meta-row">
+        <span class="meta-pill">Run: 2026-11-15</span>
+        <span class="meta-pill">Capture: gpt-6-luna, 62/62 scripted facts</span>
+        <span class="meta-pill">Agency volume: 10,000 transports / year</span>
+      </div>
+    </header>
+
+    <!-- ── HEADLINE STAT CARDS ─────────────────────────────────── -->
+    <div class="stat-grid">
+      <div class="stat-card accent-bg">
+        <div class="s-label">Net saving / year</div>
+        <div class="s-num">$40,253</div>
+        <div class="s-range">P10 $24,797 — P90 $60,285</div>
+        <div class="s-sub">Every one of 10,000 runs showed a net saving. Lowest: $5,205.</div>
+      </div>
+      <div class="stat-card">
+        <div class="s-label">Net per call</div>
+        <div class="s-num">$4.03</div>
+        <div class="s-range">P10 $2.48 — P90 $6.03</div>
+        <div class="s-sub">Scales directly with call volume: ~$100k/yr at 25,000 transports.</div>
+      </div>
+      <div class="stat-card">
+        <div class="s-label">Crew time freed / year</div>
+        <div class="s-num">553<span class="s-unit">unit-hrs</span></div>
+        <div class="s-range">P10 342 — P90 817 hours</div>
+        <div class="s-sub">Roughly half a full-time position across two-person crews.</div>
+      </div>
+      <div class="stat-card">
+        <div class="s-label">Handoff completeness</div>
+        <div class="s-num">+18<span class="s-unit">pts</span></div>
+        <div class="s-range">54% today → 72% with Relay</div>
+        <div class="s-sub">About one more element reaching the receiving clinician per patient.</div>
+      </div>
+    </div>
+
+    <!-- ── PART 1: THE REPORT ──────────────────────────────────── -->
+    <section class="impact-section">
+      <div class="section-label">Part 1</div>
+      <h2>The report</h2>
+      <p>Verbatim output of <code style="font: 13px var(--mono); color: #ffb08f;">npm run impact</code>. All figures are medians with P10–P90 intervals unless labelled otherwise.</p>
+
+      <!-- Money per call -->
+      <h3>Money per call</h3>
+      <div class="table-card">
+        <div class="data-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th></th><th>P10</th><th>Median</th><th>P90</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Crew time saved</td><td class="num">$2.33</td><td class="num">$3.85</td><td class="num">$5.81</td></tr>
+              <tr><td>Expected claim cost avoided</td><td class="num">$0.22</td><td class="num">$0.47</td><td class="num">$0.87</td></tr>
+              <tr><td>Relay running cost</td><td class="num">$0.15</td><td class="num">$0.31</td><td class="num">$0.58</td></tr>
+              <tr><td><strong>Net</strong></td><td class="accent-num">$2.48</td><td class="accent-num">$4.03</td><td class="accent-num">$6.03</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Handoff completeness -->
+      <h3>Handoff completeness by element</h3>
+      <div class="completeness-grid">
+        <div class="compl-row">
+          <div class="compl-labels">
+            <span class="compl-name">Chief concern</span>
+            <span class="compl-vals">78% → <span class="after">88%</span> &nbsp;·&nbsp; Relay capture 91%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-after" style="width:88%"></div>
+            <div class="bar-before" style="width:78%"></div>
+          </div>
+        </div>
+        <div class="compl-row">
+          <div class="compl-labels">
+            <span class="compl-name">Scene description</span>
+            <span class="compl-vals">58% → <span class="after">71%</span> &nbsp;·&nbsp; Relay capture 91%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-after" style="width:71%"></div>
+            <div class="bar-before" style="width:58%"></div>
+          </div>
+        </div>
+        <div class="compl-row">
+          <div class="compl-labels">
+            <span class="compl-name">Complete vital signs</span>
+            <span class="compl-vals">57% → <span class="after">80%</span> &nbsp;·&nbsp; Relay capture 98%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-after" style="width:80%"></div>
+            <div class="bar-before" style="width:57%"></div>
+          </div>
+        </div>
+        <div class="compl-row">
+          <div class="compl-labels">
+            <span class="compl-name">Pertinent exam findings</span>
+            <span class="compl-vals">46% → <span class="after">71%</span> &nbsp;·&nbsp; Relay capture 95%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-after" style="width:71%"></div>
+            <div class="bar-before" style="width:46%"></div>
+          </div>
+        </div>
+        <div class="compl-row">
+          <div class="compl-labels">
+            <span class="compl-name">Overall assessment</span>
+            <span class="compl-vals">31% → <span class="after">48%</span> &nbsp;·&nbsp; Relay capture 91%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-after" style="width:48%"></div>
+            <div class="bar-before" style="width:31%"></div>
+          </div>
+        </div>
+      </div>
+      <p class="hint">Grey bar = today's baseline. Green bar = with Relay. Relay can only add what the crew says aloud.</p>
+
+      <!-- Measured capture -->
+      <h3>Measured capture</h3>
+      <p class="body-p">62 scripted facts fed through the real engine on 2026-11-15. Zero misses.</p>
+      <div class="capture-grid">
+        <div class="cap-card perfect"><div class="cap-label">Chief concern</div><div class="cap-score">6 / 6<span class="cap-pct">100%</span></div></div>
+        <div class="cap-card perfect"><div class="cap-label">Scene</div><div class="cap-score">6 / 6<span class="cap-pct">100%</span></div></div>
+        <div class="cap-card perfect"><div class="cap-label">Vitals</div><div class="cap-score">26 / 26<span class="cap-pct">100%</span></div></div>
+        <div class="cap-card perfect"><div class="cap-label">Exam</div><div class="cap-score">13 / 13<span class="cap-pct">100%</span></div></div>
+        <div class="cap-card perfect"><div class="cap-label">Assessment</div><div class="cap-score">6 / 6<span class="cap-pct">100%</span></div></div>
+        <div class="cap-card perfect"><div class="cap-label">Treatment</div><div class="cap-score">5 / 5<span class="cap-pct">100%</span></div></div>
+        <div class="cap-card perfect"><div class="cap-label">Action type (per line)</div><div class="cap-score">59 / 59<span class="cap-pct">100%</span></div></div>
+        <div class="cap-card perfect"><div class="cap-label">Total facts</div><div class="cap-score">62 / 62<span class="cap-pct">100%</span></div></div>
+      </div>
+
+      <!-- Sensitivity -->
+      <h3>What moves the answer most</h3>
+      <p class="body-p">Net $/year with one input at its low vs high value, all others at their most likely.</p>
+      <div class="table-card">
+        <div class="data-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Input</th><th>Low scenario</th><th>High scenario</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Share of report time Relay saves</td><td class="num">$16,696</td><td class="green-num">$63,600</td></tr>
+              <tr><td>Minutes writing the call report</td><td class="num">$23,786</td><td class="num">$57,874</td></tr>
+              <tr><td>Wages per crew-hour (EMT + paramedic)</td><td class="num">$32,021</td><td class="num">$51,371</td></tr>
+              <tr><td>Calls where the crew uses Relay</td><td class="num">$30,111</td><td class="num">$47,676</td></tr>
+              <tr><td>Malpractice claims per 100k transports</td><td class="num">$37,852</td><td class="num">$49,332</td></tr>
+              <tr><td>Relay running cost per call (APIs)</td><td class="num">$41,748</td><td class="num">$34,148</td></tr>
+              <tr><td>Benefits/overhead multiplier on wages</td><td class="num">$37,253</td><td class="num">$43,043</td></tr>
+              <tr><td>Cost of a communication-failure claim</td><td class="num">$39,406</td><td class="num">$40,952</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Inputs table -->
+      <h3>All model inputs</h3>
+      <div class="table-card">
+        <div class="data-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Input</th><th>Low</th><th>Most likely</th><th>High</th><th>Source</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Today: chief concern included</td><td class="num">0.70</td><td class="num">0.78</td><td class="num">0.87</td><td class="src">goldberg2017</td></tr>
+              <tr><td>Today: scene description included</td><td class="num">0.48</td><td class="num">0.58</td><td class="num">0.68</td><td class="src">goldberg2017</td></tr>
+              <tr><td>Today: complete vitals included</td><td class="num">0.47</td><td class="num">0.57</td><td class="num">0.67</td><td class="src">goldberg2017</td></tr>
+              <tr><td>Today: exam findings included</td><td class="num">0.31</td><td class="num">0.47</td><td class="num">0.58</td><td class="src">goldberg2017</td></tr>
+              <tr><td>Today: overall assessment included</td><td class="num">0.22</td><td class="num">0.31</td><td class="num">0.40</td><td class="src">goldberg2017</td></tr>
+              <tr><td>Crew says chief concern aloud</td><td class="num">0.50</td><td class="num">0.75</td><td class="num">0.90</td><td class="src mute">assumption</td></tr>
+              <tr><td>Crew says scene details aloud</td><td class="num">0.30</td><td class="num">0.50</td><td class="num">0.70</td><td class="src mute">assumption</td></tr>
+              <tr><td>Crew calls out vitals aloud</td><td class="num">0.60</td><td class="num">0.80</td><td class="num">0.95</td><td class="src mute">assumption</td></tr>
+              <tr><td>Crew says exam findings aloud</td><td class="num">0.50</td><td class="num">0.70</td><td class="num">0.90</td><td class="src mute">assumption</td></tr>
+              <tr><td>Crew says an overall impression aloud</td><td class="num">0.20</td><td class="num">0.40</td><td class="num">0.60</td><td class="src mute">assumption</td></tr>
+              <tr><td>Speech-to-text keeps the fact intact</td><td class="num">0.85</td><td class="num">0.93</td><td class="num">0.98</td><td class="src mute">assumption</td></tr>
+              <tr><td>Relay gets a heard fact into the handoff</td><td class="num">0.60</td><td class="num">0.85</td><td class="num">0.95</td><td class="src mute">assumption</td></tr>
+              <tr><td>Calls where the crew uses Relay</td><td class="num">0.60</td><td class="num">0.80</td><td class="num">0.95</td><td class="src mute">assumption</td></tr>
+              <tr><td>Minutes writing the call report</td><td class="num">10</td><td class="num">17.2</td><td class="num">25</td><td class="src">cone1998</td></tr>
+              <tr><td>Share of report time Relay saves</td><td class="num">0.10</td><td class="num">0.25</td><td class="num">0.40</td><td class="src mute">assumption</td></tr>
+              <tr><td>Minutes per ambulance call (time on task)</td><td class="num">70</td><td class="num">80</td><td class="num">90</td><td class="src">xie2021</td></tr>
+              <tr><td>Wages per crew-hour (EMT + paramedic)</td><td class="num">$40</td><td class="num">$50.50</td><td class="num">$65</td><td class="src">bls2025</td></tr>
+              <tr><td>Benefits/overhead multiplier on wages</td><td class="num">1.25</td><td class="num">1.35</td><td class="num">1.45</td><td class="src mute">assumption</td></tr>
+              <tr><td>Malpractice claims per 100k transports</td><td class="num">0.5</td><td class="num">2</td><td class="num">8</td><td class="src mute">assumption</td></tr>
+              <tr><td>Claims involving a communication failure</td><td class="num">0.49</td><td class="num">0.49</td><td class="num">0.49</td><td class="src">humphrey2022</td></tr>
+              <tr><td>…of which a failed handoff</td><td class="num">0.40</td><td class="num">0.40</td><td class="num">0.40</td><td class="src">humphrey2022</td></tr>
+              <tr><td>Failed handoffs a handoff tool could avert</td><td class="num">0.77</td><td class="num">0.77</td><td class="num">0.77</td><td class="src">humphrey2022</td></tr>
+              <tr><td>Cost of a communication-failure claim</td><td class="num">$180k</td><td class="num">$237.6k</td><td class="num">$300k</td><td class="src">humphrey2022</td></tr>
+              <tr><td>Relay running cost per call (APIs)</td><td class="num">$0.05</td><td class="num">$0.25</td><td class="num">$1.00</td><td class="src mute">assumption</td></tr>
+              <tr><td>Collected revenue per extra transport</td><td class="num">$300</td><td class="num">$550</td><td class="num">$900</td><td class="src mute">assumption</td></tr>
+              <tr><td>Freed unit time that becomes billed calls</td><td class="num">0</td><td class="num">0.20</td><td class="num">0.50</td><td class="src mute">assumption</td></tr>
+              <tr><td>Transports per year (your agency)</td><td class="num">10,000</td><td class="num">10,000</td><td class="num">10,000</td><td class="src mute">assumption</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Sources -->
+      <h3>Sources</h3>
+      <ul class="sources">
+        <li><strong>goldberg2017</strong>: Goldberg SA et al. Quantitative Analysis of the Content of EMS Handoff of Critically Ill and Injured Patients to the Emergency Department. <em>Prehosp Emerg Care</em> 2017;21(1):14-17. <a href="https://pubmed.ncbi.nlm.nih.gov/27420753/" target="_blank" rel="noopener">PubMed ↗</a> — 90 observed EMS-to-ED handoffs.</li>
+        <li><strong>cone1998</strong>: Cone DC et al. A time-motion study of the emergency medical services turnaround interval. <em>Ann Emerg Med</em> 1998. <a href="https://pubmed.ncbi.nlm.nih.gov/9472188/" target="_blank" rel="noopener">PubMed ↗</a> — Writing the call report averaged 17 min 12 s (range 5:20 to 52:11).</li>
+        <li><strong>xie2021</strong>: Xie F et al. Economic Analysis of Mobile Integrated Health Care Delivered by EMS Paramedic Teams. <em>JAMA Netw Open</em> 2021. <a href="https://pubmed.ncbi.nlm.nih.gov/33625510/" target="_blank" rel="noopener">PubMed ↗</a> — Mean time on task 79–84 min.</li>
+        <li><strong>bls2025</strong>: US Bureau of Labor Statistics, Occupational Outlook Handbook: EMTs and Paramedics (May 2025). <a href="https://www.bls.gov/ooh/healthcare/emts-and-paramedics.htm" target="_blank" rel="noopener">BLS ↗</a> — Median: EMTs $44,470/yr, paramedics $60,600/yr.</li>
+        <li><strong>humphrey2022</strong>: Humphrey KE et al. Frequency and Nature of Communication and Handoff Failures in Medical Malpractice Claims. <em>J Patient Saf</em> 2022. <a href="https://pubmed.ncbi.nlm.nih.gov/35188927/" target="_blank" rel="noopener">PubMed ↗</a> — Communication failures in 49% of claims; mean total cost $237,600.</li>
+      </ul>
+
+      <div class="callout" style="margin-top: 32px;">
+        <p><strong>Not modelled:</strong> patient outcomes beyond claim cost, ED-side time saved, Relay misrecording a value, crew distraction. Assumptions labelled "assumption" have no published source and should be replaced with pilot data.</p>
+      </div>
+    </section>
+
+    <hr class="rule" />
+
+    <!-- ── PART 2: HOW WE GOT THESE NUMBERS ───────────────────── -->
+    <section class="impact-section">
+      <div class="section-label">Part 2</div>
+      <h2>How we got these numbers</h2>
+
+      <p>Relay has no field data yet, so we can't measure its impact directly. We combine three things:</p>
+      <ul style="color: var(--ink-2); font-size: 17px; line-height: 1.7; padding-left: 22px; margin: 0 0 20px;">
+        <li><strong style="color: var(--ink);">What published studies say happens today</strong> — how often each piece of information makes it into a handoff, how long crews spend writing reports.</li>
+        <li><strong style="color: var(--ink);">What we can measure about Relay itself</strong> — scripted ambulance calls run through the real code, every expected fact checked.</li>
+        <li><strong style="color: var(--ink);">Explicit assumptions for everything else</strong> — each with a low, most likely, and high value.</li>
+      </ul>
+      <p>We run the arithmetic 10,000 times with different combinations of those values to get a range of outcomes rather than one number.</p>
+
+      <h3>Step 1 — Measure Relay on scripted calls</h3>
+      <p class="body-p">Six realistic calls with synthetic patients: chest pain, a car crash, a stroke, an asthma attack, low blood sugar, and an elderly fall. 59 spoken lines total, including small talk and one correction. Each line was fed through the same code the product runs:</p>
+      <ol style="color: var(--ink-2); font-size: 17px; line-height: 1.7; padding-left: 22px; margin: 0 0 20px;">
+        <li>OpenAI (gpt-6-luna) proposes an action for the line.</li>
+        <li>Relay's engine checks the proposal against the current task state.</li>
+        <li>The handoff is built from that state.</li>
+      </ol>
+      <p class="body-p">We then checked whether each of the 62 expected facts appeared in the handoff. <strong style="color: var(--ink);">Result: 62 of 62 captured, 59 of 59 lines classified correctly.</strong></p>
+
+      <h3>Step 2 — Handoff completeness formula</h3>
+      <p class="body-p">Goldberg 2017 gives the baseline rate <em>b</em> for each element. Relay can only add an element the crew would have left out, and only when all four of these hold:</p>
+      <div class="formula">
+        <pre>with Relay = b + (1 − b) × capture × speech-to-text × said_aloud × adoption</pre>
+      </div>
+      <p class="body-p"><strong style="color: var(--ink);">Worked example — vital signs at most likely values:</strong></p>
+      <div class="formula">
+        <pre>0.57 + (1 − 0.57) × (0.964 × 0.93 × 0.80 × 0.80)
+= 0.57 + 0.43 × 0.574
+= 0.80   →  full vitals reach the hospital in 80% of handoffs instead of 57%</pre>
+      </div>
+      <p class="body-p" style="margin-top: 10px;">The 0.964 is the measured capture for vitals: (26 + 1) / (26 + 2), explained in Step 5.</p>
+
+      <h3>Step 3 — Time and money per call</h3>
+      <div class="formula">
+        <pre>minutes saved   = report-writing minutes × share Relay saves × adoption
+                = 17.2 × 0.25 × 0.80  =  3.44 min
+
+crew time ($)   = minutes / 60 × crew-hour wage × overhead
+                = 3.44 / 60 × $50.50 × 1.35  =  $3.91
+
+claim cost ($)  = claims per transport × share from comm failures
+                  × share of those that are handoffs × share a tool averts
+                  × share of omissions Relay fills × cost per claim
+                = (2 / 100,000) × 0.49 × 0.40 × 0.77 × 0.43 × $237,600 = $0.31
+
+running cost    = API cost per call × adoption = $0.25 × 0.80  =  $0.20
+
+net per call    = $3.91 + $0.31 − $0.20  =  $4.01
+net per year    = $4.01 × 10,000 transports  ≈  $40,100</pre>
+      </div>
+
+      <h3>Step 4 — Where each input comes from</h3>
+      <div class="table-card">
+        <div class="data-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Input</th><th>Value used</th><th>Source</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Elements in today's handoffs</td><td>31–78% by element</td><td class="src">Goldberg 2017, 90 observed handoffs; 95% CIs as range</td></tr>
+              <tr><td>Minutes writing a call report</td><td>17.2 (range 10–25)</td><td class="src">Cone 1998, time-motion study of 122 deliveries</td></tr>
+              <tr><td>Crew wages</td><td>$50.50 per crew-hour</td><td class="src">BLS May 2025 median (EMT + paramedic)</td></tr>
+              <tr><td>Length of an ambulance call</td><td>80 min</td><td class="src">Xie 2021 (79–84 min)</td></tr>
+              <tr><td>Claim shares and cost</td><td>49%, 40%, 77%, $237,600</td><td class="src">Humphrey 2022, malpractice claims study</td></tr>
+              <tr><td>Relay's capture rate</td><td>87–96% by element</td><td class="src" style="color: var(--green);">Measured on Relay (Step 1)</td></tr>
+              <tr><td>Share of report time saved, said aloud, speech-to-text, adoption, claim rate, API cost</td><td>See inputs table</td><td class="src mute">Our assumptions — no published source</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3>Step 5 — Monte Carlo (turning ranges into a range of outcomes)</h3>
+      <p class="body-p">Every input has a low, most likely, and high value. Each of the 10,000 runs picks one value per input:</p>
+      <ul style="color: var(--ink-2); font-size: 17px; line-height: 1.7; padding-left: 22px; margin: 0 0 20px;">
+        <li><strong style="color: var(--ink);">Assumed and published inputs</strong> are drawn from a triangle distribution. Values near the most likely one come up more often.</li>
+        <li><strong style="color: var(--ink);">Measured capture rates</strong> are drawn from Beta(hits + 1, misses + 1) — the standard way to express uncertainty about a success rate from a small test. A perfect 6 of 6 still allows the true rate to be lower; it centres around 87–91%, not 100%.</li>
+      </ul>
+      <p class="body-p">The random seed is fixed, so the same inputs always produce the same report. The sensitivity table (Part 1) moves one input to its low/high while holding all others at their most likely value.</p>
+    </section>
+
+    <hr class="rule" />
+
+    <!-- ── PART 3: WHAT THE NUMBERS MEAN ──────────────────────── -->
+    <section class="impact-section">
+      <div class="section-label">Part 3</div>
+      <h2>What the numbers mean</h2>
+
+      <h3>In plain terms</h3>
+
+      <div class="callout green" style="margin-bottom: 20px;">
+        <p><strong>$40,000 a year, or about $4 per call, for a 10,000-transport agency.</strong> That is roughly two-thirds of one paramedic's median salary ($60,600). Scales to ~$100,000 at 25,000 transports.</p>
+      </div>
+
+      <ul style="color: var(--ink-2); font-size: 17px; line-height: 1.7; padding-left: 22px; margin: 0 0 24px;">
+        <li><strong style="color: var(--ink);">The saving is almost all crew time, not legal risk.</strong> Of the $4 per call, ~$3.90 is report time saved and ~$0.30–0.50 is avoided claim cost. We would not pitch Relay as a liability tool.</li>
+        <li><strong style="color: var(--ink);">About 550 crew-hours a year.</strong> With two people per crew, that is ~1,100 person-hours — roughly half a full-time position, or the capacity to cover ~4% more calls (~416).</li>
+        <li><strong style="color: var(--ink);">Handoffs go from 54% to 72% complete.</strong> About 2.7 of 5 elements today; ~3.6 with Relay. Roughly one more element per patient.</li>
+        <li><strong style="color: var(--ink);">Vitals and exam findings improve most.</strong> Full vitals: 57% → 80%. Crews already call vitals out to each other.</li>
+        <li><strong style="color: var(--ink);">Overall assessment improves least</strong> (31% → 48%). Crews rarely say their overall impression aloud, and Relay can't record what isn't said.</li>
+        <li>Completeness is a per-handoff figure — it doesn't depend on agency size.</li>
+      </ul>
+
+      <h3>The most important caveat</h3>
+      <div class="callout">
+        <p>The dollar figure rests mostly on one assumption: <strong>Relay saves 25% of report-writing time.</strong> No published study gives us this number. If Relay saved no report time at all, the net saving would fall to about <strong>$1,000 a year</strong>. If it saved 40%, the net saving would rise to about <strong>$64,000</strong>. The handoff-completeness benefit holds either way. <strong>The financial case needs a pilot that times reports with and without Relay.</strong></p>
+      </div>
+
+      <h3>How confident are we? (80% intervals)</h3>
+      <p class="body-p">P10 to P90 means 80% of the 10,000 simulated outcomes fall inside that range.</p>
+
+      <div class="interval-row">
+        <div class="int-cell featured">
+          <div class="int-label">Net saving / year — median</div>
+          <div class="int-val">$40,253</div>
+          <div class="int-range">80% interval: $24,797 – $60,285</div>
+        </div>
+        <div class="int-cell">
+          <div class="int-label">Net saving / year — 90% interval</div>
+          <div class="int-val" style="font-size:16px; color: var(--ink-2);">$21,442 – $66,214</div>
+          <div class="int-range">P5 – P95</div>
+        </div>
+        <div class="int-cell">
+          <div class="int-label">Completeness gain</div>
+          <div class="int-val">+18 points</div>
+          <div class="int-range">+14 to +22 points (90% interval)</div>
+        </div>
+      </div>
+
+      <ul style="color: var(--ink-2); font-size: 17px; line-height: 1.7; padding-left: 22px; margin: 16px 0 24px;">
+        <li><strong style="color: var(--green);">Every one</strong> of the 10,000 runs showed a net saving. The lowest was $5,205.</li>
+        <li><strong style="color: var(--green);">96.5%</strong> of runs exceeded $20,000 a year.</li>
+        <li>The simulation is stable: changing the random seed moves the median by only about ±$300.</li>
+      </ul>
+
+      <div class="callout">
+        <p><strong>This is not a classical statistical confidence interval.</strong> It shows how uncertainty in the inputs spreads to the outputs — only as good as the input ranges, and several of those are our judgment. The interval also doesn't include model structure assumptions, Relay misrecording a value, or real ambulance noise.</p>
+      </div>
+
+      <h3>Confidence in the measured capture rate</h3>
+      <p class="body-p">62 of 62 is a strong result on a small test.</p>
+      <ul style="color: var(--ink-2); font-size: 17px; line-height: 1.7; padding-left: 22px; margin: 0 0 24px;">
+        <li><strong style="color: var(--ink);">All 62 facts together:</strong> at 95% confidence, the true capture rate on this kind of input is at least about <strong style="color: var(--green);">94%</strong>.</li>
+        <li><strong style="color: var(--ink);">One element on its own</strong> (e.g. the 6 scene facts): the 95% lower bound is only about <strong style="color: var(--amber);">54%</strong>. That is why the model doesn't treat capture as 100%.</li>
+      </ul>
+
+      <h3>Confidence by claim</h3>
+      <div class="table-card">
+        <div class="data-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Claim</th><th>Confidence</th><th>Why</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Relay's engine gets clearly spoken facts into the handoff</td>
+                <td><span class="conf-high">High</span></td>
+                <td class="mute">Measured on the real code: 62 of 62, 59 of 59</td>
+              </tr>
+              <tr>
+                <td>Today's handoffs miss a lot (only 54% of elements included)</td>
+                <td><span class="conf-high">High</span></td>
+                <td class="mute">Published observational study (Goldberg 2017)</td>
+              </tr>
+              <tr>
+                <td>Relay makes handoffs meaningfully more complete (+14 to +22 points)</td>
+                <td><span class="conf-med">Medium</span></td>
+                <td class="mute">Direction is solid; size depends on how much crews say aloud and on audio quality — both assumed</td>
+              </tr>
+              <tr>
+                <td>Relay saves about $40k a year per 10,000 transports</td>
+                <td><span class="conf-low">Low–Medium</span></td>
+                <td class="mute">Mostly driven by an assumed share of report time saved; needs a timed pilot</td>
+              </tr>
+              <tr>
+                <td>Relay meaningfully reduces malpractice cost</td>
+                <td><span class="conf-low">Low</span></td>
+                <td class="mute">No published EMS claim rate; even generous values give under $1 per call</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3>What would raise our confidence fastest</h3>
+      <ul class="next-list">
+        <li>
+          <span class="n">01</span>
+          <p><strong>Time call reports with and without Relay</strong> on a few shifts. This replaces the biggest assumption and directly validates the financial case.</p>
+        </li>
+        <li>
+          <span class="n">02</span>
+          <p><strong>Re-run the capture test on recorded band audio from a moving ambulance.</strong> Replaces the speech-to-text assumption and tests real noise, crosstalk, and accents.</p>
+        </li>
+        <li>
+          <span class="n">03</span>
+          <p><strong>Count what crews actually say aloud</strong> during real calls. Replaces the "said aloud" family of assumptions — currently the second-largest source of uncertainty.</p>
+        </li>
+        <li>
+          <span class="n">04</span>
+          <p><strong>Log actual API spend per call.</strong> Replaces the running-cost assumption. Each of these inputs is already in the model, so new data drops straight in and the report regenerates with <code style="font: 13px var(--mono); color: #ffb08f;">npm run impact</code>.</p>
+        </li>
+      </ul>
+    </section>
+
+    <footer class="foot" style="margin-top: 80px;">
+      <span>Relay — Impact report</span>
+      <span class="hint">Deepgram · OpenAI · MiniMax · Vexo Band</span>
+    </footer>
+
+  </div>
+</body>
+</html>

@@ -2,12 +2,12 @@
 """
 Relay coordinator listener — laptop mic push-to-talk that dispatches band commands.
 
-The coordinator speaks naturally ("assign repeat blood pressure to Vaishnav") and the
+The coordinator speaks naturally ("assign repeat blood pressure to Chris") and the
 transcript is parsed by OpenAI into a band command, then POSTed to the Express server.
 
 Usage:
     python3 listen.py                      # real laptop mic (requires sounddevice)
-    python3 listen.py --say "assign BP check to Vaishnav"   # bypass mic for testing
+    python3 listen.py --say "assign BP check to Chris"   # bypass mic for testing
 
 Prerequisites:
     python3 -m pip install sounddevice     # for real mic (macOS: brew install portaudio first)
@@ -49,7 +49,7 @@ import ai
 
 # ── constants ────────────────────────────────────────────────────────────────
 SERVER_URL = "http://localhost:3000"
-CREW_ID = "vaishnav"          # only crew member with a band right now
+CREW_ID = "chris"          # only crew member with a band right now
 SAMPLE_RATE = 16000           # Deepgram expects 16 kHz mono
 
 # ── speaking suppression ─────────────────────────────────────────────────────
@@ -87,26 +87,26 @@ def _speaking_guard_loop() -> None:
 
 # ── intent tools (same set as band_bridge.py) ────────────────────────────────
 _INTENT_TOOLS = [
-    ai.tool("assigned",    "Assign a medical task to Vaishnav",                       task="string"),
-    ai.tool("timerExpired","A timer for Vaishnav has gone off",                       label="string"),
-    ai.tool("clarify",     "Ask Vaishnav to clarify something",                       what="string"),
-    ai.tool("taskSent",    "Vaishnav is sending a task to another crew member",       task="string", person="string"),
-    ai.tool("completed",   "Vaishnav is reporting the result of a completed task",    result="string"),
+    ai.tool("assigned",    "Assign a medical task to Chris",                       task="string"),
+    ai.tool("timerExpired","A timer for Chris has gone off",                       label="string"),
+    ai.tool("clarify",     "Ask Chris to clarify something",                       what="string"),
+    ai.tool("taskSent",    "Chris is sending a task to another crew member",       task="string", person="string"),
+    ai.tool("completed",   "Chris is reporting the result of a completed task",    result="string"),
     ai.tool("none",        "Nothing here is a band command — ignore this transcript"),
 ]
 
 _INTENT_INSTRUCTIONS = (
-    "You are dispatching commands for an EMS wristband worn by Vaishnav. "
+    "You are dispatching commands for an EMS wristband worn by Chris. "
     "This is an emergency medical setting. Rules:\n"
     "- 'assigned': any request to perform a clinical task. "
     "  'repeat blood pressure', 'can you repeat the BP', 'check vitals', 'get an IV' all map to assigned. "
     "  'repeat X' means perform X again — it is NOT clarify. "
     "  Task field: short clean description only, e.g. 'repeat blood pressure'. "
-    "  Strip 'hey Vaishnav', 'can you', 'please', 'assign', 'repeat' (when it means do-again) from the task.\n"
-    "- 'clarify': only when YOU (the system) need Vaishnav to repeat or explain an ambiguous instruction.\n"
+    "  Strip 'hey Chris', 'can you', 'please', 'assign', 'repeat' (when it means do-again) from the task.\n"
+    "- 'clarify': only when YOU (the system) need Chris to repeat or explain an ambiguous instruction.\n"
     "- 'timerExpired': a specific timer has gone off.\n"
-    "- 'taskSent': Vaishnav is handing a task to someone else.\n"
-    "- 'completed': Vaishnav is reporting a measurement or finding, e.g. 'blood pressure 120 over 80', 'pulse ox 98'. "
+    "- 'taskSent': Chris is handing a task to someone else.\n"
+    "- 'completed': Chris is reporting a measurement or finding, e.g. 'blood pressure 120 over 80', 'pulse ox 98'. "
     "  Result field: the measurement or finding exactly as spoken.\n"
     "- 'none': purely ambient speech — greetings, thanks, filler. No clinical action present.\n"
     "When in doubt between assigned and none, pick assigned."
@@ -158,7 +158,7 @@ def _run_mic_mode() -> None:
             "  python3 -m pip install sounddevice\n"
             "On macOS, install portaudio first:  brew install portaudio\n"
             "\nAlternatively, test without a mic:\n"
-            '  python3 listen.py --say "assign repeat blood pressure to Vaishnav"',
+            '  python3 listen.py --say "assign repeat blood pressure to Chris"',
             file=sys.stderr,
         )
         sys.exit(1)
@@ -211,16 +211,16 @@ def main() -> None:
         if idx + 1 < len(args):
             say_text = args[idx + 1]
         else:
-            print('--say requires a quoted phrase, e.g. --say "assign BP check to Vaishnav"', file=sys.stderr)
+            print('--say requires a quoted phrase, e.g. --say "assign BP check to Chris"', file=sys.stderr)
             sys.exit(1)
 
     if say_text is not None:
         _run_say_mode(say_text)
     else:
         print("Coordinator listener ready. Speak naturally:")
-        print('  e.g. "Assign repeat blood pressure to Vaishnav"')
-        print('  e.g. "Vaishnav, two-minute timer is up"')
-        print('  e.g. "Hey Vaishnav, clarify who that task is for"\n')
+        print('  e.g. "Assign repeat blood pressure to Chris"')
+        print('  e.g. "Chris, two-minute timer is up"')
+        print('  e.g. "Hey Chris, clarify who that task is for"\n')
         _run_mic_mode()
 
 
